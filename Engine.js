@@ -118,10 +118,19 @@ class GameObject {
     return pos;
   };
 
-  GetDimensions = () => {
-    var dim = [];
-    dim[0] = this.sImage.width;
-    dim[1] = this.sImage.height;
+  GetSize = () => {
+    let dim = { width: 0, height: 0 };
+    if (this.body != null) {
+      dim = {
+        width: this.body?.radius * 2 || this.body.width,
+        height: this.body?.radius * 2 || this.body.height,
+      };
+      return dim;
+    }
+    dim = {
+      width: this.sImage.width,
+      height: this.sImage.height,
+    };
     return dim;
   };
 
@@ -132,6 +141,10 @@ class GameObject {
         this.body.position,
         new Matter.Vector.create(x, y)
       );
+  };
+
+  AddTorque = (torque) => {
+    if (this.body != null) this.body.torque = torque;
   };
 }
 
@@ -341,29 +354,16 @@ class InputManager {
   checkClick = (method) => {
     //check we clicked on an object
     for (var i = 0; i < this.activeScene.objects.length; i++) {
-      let width =
-        this.activeScene.objects[i].sImage?.width ||
-        this.activeScene.objects[i].body.width;
-      let height =
-        this.activeScene.objects[i].sImage?.height ||
-        this.activeScene.objects[i].body.height;
-      let radius = this.activeScene.objects[i].body?.radius;
+      let obj = this.activeScene.objects[i];
+      let size = obj.GetSize();
 
-      if (radius != null) {
-        if (
-          this.lastPt.x > this.activeScene.objects[i].x - radius &&
-          this.lastPt.y > this.activeScene.objects[i].y - radius &&
-          this.lastPt.x < this.activeScene.objects[i].x + radius &&
-          this.lastPt.y < this.activeScene.objects[i].y + radius
-        )
-          this.activeScene.objects[i][method]();
-      } else if (
-        this.lastPt.x > this.activeScene.objects[i].x &&
-        this.lastPt.y > this.activeScene.objects[i].y &&
-        this.lastPt.x < this.activeScene.objects[i].x + width &&
-        this.lastPt.y < this.activeScene.objects[i].y + height
+      if (
+        this.lastPt.x > obj.x - size.width / 2 &&
+        this.lastPt.y > obj.y - size.height / 2 &&
+        this.lastPt.x < obj.x + size.width / 2 &&
+        this.lastPt.y < obj.y + size.height / 2
       )
-        this.activeScene.objects[i][method]();
+        obj[method]();
     }
   };
 }

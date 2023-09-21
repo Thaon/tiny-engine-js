@@ -2,6 +2,7 @@ function StartGame() {
   const engine = new Engine();
 
   const scene = engine.sceneManager.AddScene("game");
+  engine.debugPhysics = true;
 
   const ground = engine.AddGameObject(
     "ground",
@@ -28,10 +29,14 @@ function StartGame() {
     {
       type: "box",
       width: 100,
-      height: 100,
+      height: 150,
       static: false,
     }
   );
+
+  box.OnTouch = () => {
+    box.AddTorque(1);
+  };
 
   const circle = engine.AddGameObject(
     "circle",
@@ -48,7 +53,6 @@ function StartGame() {
   );
 
   circle.OnTouchUp = () => {
-    console.log("touch up");
     circle.AddForce(0, -1);
   };
 
