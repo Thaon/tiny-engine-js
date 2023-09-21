@@ -48,24 +48,26 @@ stage.on("click tap", function (e) {
     return;
   }
 
+  let toSelect = e.target;
+  if (toSelect.className == "Text") return;
   // do we pressed shift or ctrl?
   const metaPressed = e.evt.shiftKey || e.evt.ctrlKey || e.evt.metaKey;
-  const isSelected = tr.nodes().indexOf(e.target) >= 0;
+  const isSelected = tr.nodes().indexOf(toSelect) >= 0;
 
   if (!metaPressed && !isSelected) {
     // if no key pressed and the node is not selected
     // select just one
-    tr.nodes([e.target]);
+    tr.nodes([toSelect]);
   } else if (metaPressed && isSelected) {
     // if we pressed keys and node was selected
     // we need to remove it from selection:
     const nodes = tr.nodes().slice(); // use slice to have new copy of array
     // remove node from array
-    nodes.splice(nodes.indexOf(e.target), 1);
+    nodes.splice(nodes.indexOf(toSelect), 1);
     tr.nodes(nodes);
   } else if (metaPressed && !isSelected) {
     // add the node into selection
-    const nodes = tr.nodes().concat([e.target]);
+    const nodes = tr.nodes().concat([toSelect]);
     tr.nodes(nodes);
   }
 });
@@ -74,7 +76,7 @@ var group = new Konva.Group();
 layer.add(group);
 
 // Zoom
-let scaleBy = 1.1;
+let scaleBy = 1.05;
 stage.on("wheel", (e) => {
   // stop default scrolling
   e.evt.preventDefault();
@@ -124,17 +126,41 @@ container.addEventListener("keydown", function (e) {
       break;
     // Create circle at mouuse position
     case "C":
-      let circle = new Konva.Circle({
-        x: pointerPos.x,
-        y: pointerPos.y,
-        radius: 10,
-        fill: "white",
-        stroke: "black",
-        strokeWidth: 4,
-        draggable: true,
-      });
-      layer.add(circle);
-      layer.draw();
+      if (tr.nodes().length == 1) {
+        let nodePos = tr.nodes()[0].getAbsolutePosition();
+        if (tr.nodes()[0].className == "Image" || tr.nodes()[0].name != "")
+          return;
+        // get user input for radius
+        let path = prompt("Enter Image Path");
+        var imageObj = new Image();
+        imageObj.onload = function () {
+          var img = new Konva.Image({
+            x: nodePos.x - imageObj.width / 2,
+            y: nodePos.y - imageObj.height / 2,
+            image: imageObj,
+            draggable: true,
+          });
+
+          // add the shape to the layer
+          layer.add(img);
+        };
+        imageObj.src = path;
+        tr.nodes()[0].destroy();
+        tr.nodes([]);
+        layer.draw();
+      } else if (tr.nodes().length == 0) {
+        let circle = new Konva.Circle({
+          x: pointerPos.x,
+          y: pointerPos.y,
+          radius: 10,
+          fill: "white",
+          stroke: "black",
+          strokeWidth: 4,
+          draggable: true,
+        });
+        layer.add(circle);
+        layer.draw();
+      } else tr.nodes([]);
       break;
     // Duplicate selection
     case "D":
@@ -160,6 +186,33 @@ container.addEventListener("keydown", function (e) {
           layer.add(clone);
           layer.draw();
         });
+      }
+      break;
+    // Give object a name
+    case "N":
+      if (tr.nodes().length == 1) {
+        let node = tr.nodes()[0];
+        if (node.name() != "") return;
+        let name = prompt("Enter Name");
+        let newGroup = new Konva.Group({
+          draggable: true,
+        });
+        newGroup.add(node);
+        node.draggable(false);
+        node.name(name);
+        // add text and group them
+        var text = new Konva.Text({
+          x: node.x() - node.width() / 2,
+          y: node.y() + node.height() / 2,
+          text: name,
+          fontSize: 30,
+          fontFamily: "Calibri",
+          align: "center",
+          width: node.width(),
+        });
+        newGroup.add(text);
+        layer.add(newGroup);
+        layer.draw();
       }
       break;
   }
