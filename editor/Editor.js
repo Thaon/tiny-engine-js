@@ -16,19 +16,19 @@ container.focus();
 // then create layer
 let layer = new Konva.Layer();
 
-// create our shape
-let circle = new Konva.Circle({
-  x: stage.width() / 2,
-  y: stage.height() / 2,
-  radius: 70,
-  fill: "red",
-  stroke: "black",
-  strokeWidth: 4,
-  draggable: true,
-});
+// // create our shape
+// let circle = new Konva.Circle({
+//   x: stage.width() / 2,
+//   y: stage.height() / 2,
+//   radius: 70,
+//   fill: "red",
+//   stroke: "black",
+//   strokeWidth: 4,
+//   draggable: true,
+// });
 
-// add the shape to the layer
-layer.add(circle);
+// // add the shape to the layer
+// layer.add(circle);
 
 // add the layer to the stage
 stage.add(layer);
@@ -135,14 +135,11 @@ container.addEventListener("keydown", function (e) {
       break;
     // Create circle at mouuse position
     case "C":
+      // if we have a selection of a single node, we customize it
       if (tr.nodes().length == 1) {
         let nodePos = tr.nodes()[0].getAbsolutePosition();
-        console.log(tr.nodes()[0].className, tr.nodes()[0].name());
         if (tr.nodes()[0].className == "Image" || tr.nodes()[0].name() != "")
           return;
-        // get user input for radius
-        // let path = prompt("Enter Image Path");
-        console.log("here");
         // get image path from file explorer
         var f = document.createElement("input");
         f.style.display = "none";
@@ -164,28 +161,16 @@ container.addEventListener("keydown", function (e) {
                 draggable: true,
               });
               tr.nodes()[0].destroy();
-              tr.nodes([]);
+              tr.nodes([image]);
               layer.add(image);
               layer.draw();
             };
           };
           reader.readAsDataURL(file);
         };
-
-        // var imageObj = new Image();
-        // imageObj.onload = function () {
-        //   var img = new Konva.Image({
-        //     x: nodePos.x - imageObj.width / 2,
-        //     y: nodePos.y - imageObj.height / 2,
-        //     image: imageObj,
-        //     draggable: true,
-        //   });
-
-        //   // add the shape to the layer
-        //   layer.add(img);
-        // };
-        // imageObj.src = path;
-      } else if (tr.nodes().length == 0) {
+      }
+      // if we have a selection of none, we create a new one
+      else if (tr.nodes().length == 0) {
         let circle = new Konva.Circle({
           x: pointerPos.x,
           y: pointerPos.y,
@@ -196,8 +181,9 @@ container.addEventListener("keydown", function (e) {
           draggable: true,
         });
         layer.add(circle);
+        tr.nodes([circle]);
         layer.draw();
-      } else tr.nodes([]);
+      } else tr.nodes([]); // if we have a selection of multiple nodes, we deselect them
       break;
     // Duplicate selection
     case "D":
@@ -220,13 +206,34 @@ container.addEventListener("keydown", function (e) {
           // set positions centered on mouse bt mantaining relative offsets between them
           clone.x(pointerPos.x + offsetX);
           clone.y(pointerPos.y + offsetY);
-          layer.add(clone);
+          // if node has name, we create a text node
+          if (node.name() != "") {
+            let newGroup = new Konva.Group({
+              draggable: true,
+            });
+            let text = new Konva.Text({
+              x: clone.x(),
+              y: clone.y() + clone.height() + 10,
+              text: node.name(),
+              fontSize: 30,
+              fontFamily: "Calibri",
+              align: "center",
+              width: clone.width(),
+            });
+            newGroup.add(clone);
+            clone.draggable(false);
+            newGroup.add(text);
+            layer.add(newGroup);
+          } else {
+            layer.add(clone);
+          }
           layer.draw();
         });
       }
       break;
     // Give object a name
     case "N":
+      // if we have a selection of a single node, we name it
       if (tr.nodes().length == 1) {
         let node = tr.nodes()[0];
         if (node.name() != "") return;
@@ -239,8 +246,8 @@ container.addEventListener("keydown", function (e) {
         node.name(name);
         // add text and group them
         var text = new Konva.Text({
-          x: node.x() - node.width() / 2,
-          y: node.y() + node.height() / 2,
+          x: node.x(),
+          y: node.y() + node.height() + 10,
           text: name,
           fontSize: 30,
           fontFamily: "Calibri",
@@ -251,6 +258,33 @@ container.addEventListener("keydown", function (e) {
         layer.add(newGroup);
         layer.draw();
       }
+      break;
+
+    // Save stage to a file
+    case "S":
+      let toSave = stage.toJSON();
+      toSave = JSON.parse(toSave);
+      // flatten the children array recursively
+      let children = [];
+      let flatten = function (arr) {
+        if (Array.isArray(arr)) {
+          arr.forEach((child) => {
+            if (child.children) {
+              flatten(child.children);
+            }
+            if (child.attrs?.name != null) children.push(child.attrs);
+          });
+        }
+      };
+      flatten(toSave.children);
+      console.log(children);
+      var a = document.createElement("a");
+      var file = new Blob([JSON.stringify({ gameObjects: children })], {
+        type: "text/plain",
+      });
+      a.href = URL.createObjectURL(file);
+      a.download = "Level.json";
+      a.click();
       break;
   }
   e.preventDefault();

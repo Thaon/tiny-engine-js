@@ -425,6 +425,19 @@ class SceneManager {
   }
 }
 
+// class Level {
+//   //the level class is a simple container for the level data
+//   constructor(name, background, foreground, levelData) {
+//     this.name = name;
+//     this.gameObjects = levelData;
+//   }
+
+//   name;
+//   background;
+//   foreground;
+//   levelData;
+// }
+
 // SECTION Game Engine ---------------------------------------------
 
 class Engine {
