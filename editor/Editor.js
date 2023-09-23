@@ -47,6 +47,7 @@ stage.on("click tap", function (e) {
     tr.nodes([]);
     return;
   }
+  tr.zIndex(999);
 
   let toSelect = e.target;
   if (toSelect.className == "Text") return;
@@ -114,6 +115,14 @@ container.addEventListener("keydown", function (e) {
   let char = String.fromCharCode(e.keyCode);
   var pointerPos = group.getRelativePointerPosition();
 
+  // change z index
+  if (parseInt(char) >= 0 && parseInt(char) <= 9) {
+    if (tr.nodes().length == 1) {
+      let node = tr.nodes()[0];
+      node.zIndex(parseInt(char));
+    }
+  }
+
   switch (char) {
     // Destroy selection
     case "X":
@@ -128,26 +137,54 @@ container.addEventListener("keydown", function (e) {
     case "C":
       if (tr.nodes().length == 1) {
         let nodePos = tr.nodes()[0].getAbsolutePosition();
-        if (tr.nodes()[0].className == "Image" || tr.nodes()[0].name != "")
+        console.log(tr.nodes()[0].className, tr.nodes()[0].name());
+        if (tr.nodes()[0].className == "Image" || tr.nodes()[0].name() != "")
           return;
         // get user input for radius
-        let path = prompt("Enter Image Path");
-        var imageObj = new Image();
-        imageObj.onload = function () {
-          var img = new Konva.Image({
-            x: nodePos.x - imageObj.width / 2,
-            y: nodePos.y - imageObj.height / 2,
-            image: imageObj,
-            draggable: true,
-          });
-
-          // add the shape to the layer
-          layer.add(img);
+        // let path = prompt("Enter Image Path");
+        console.log("here");
+        // get image path from file explorer
+        var f = document.createElement("input");
+        f.style.display = "none";
+        f.type = "file";
+        f.name = "file";
+        document.getElementById("container").appendChild(f);
+        f.click();
+        f.onchange = function () {
+          var file = f.files[0];
+          var reader = new FileReader();
+          reader.onload = function (e) {
+            var img = new Image();
+            img.src = e.target.result;
+            img.onload = function () {
+              var image = new Konva.Image({
+                x: nodePos.x - img.width / 2,
+                y: nodePos.y - img.height / 2,
+                image: img,
+                draggable: true,
+              });
+              tr.nodes()[0].destroy();
+              tr.nodes([]);
+              layer.add(image);
+              layer.draw();
+            };
+          };
+          reader.readAsDataURL(file);
         };
-        imageObj.src = path;
-        tr.nodes()[0].destroy();
-        tr.nodes([]);
-        layer.draw();
+
+        // var imageObj = new Image();
+        // imageObj.onload = function () {
+        //   var img = new Konva.Image({
+        //     x: nodePos.x - imageObj.width / 2,
+        //     y: nodePos.y - imageObj.height / 2,
+        //     image: imageObj,
+        //     draggable: true,
+        //   });
+
+        //   // add the shape to the layer
+        //   layer.add(img);
+        // };
+        // imageObj.src = path;
       } else if (tr.nodes().length == 0) {
         let circle = new Konva.Circle({
           x: pointerPos.x,
