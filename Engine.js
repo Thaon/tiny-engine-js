@@ -53,6 +53,7 @@ class GameObject {
   OnCollision = (collider) => {}; //gets called by the engine whenever this object is colliding with another one, in the CollisionDetection() function
 
   SetSprite = (name, resize = false) => {
+    console.log(name, this.engine.spritesManager);
     this.sImage = this.engine.spritesManager.GetSprite(name);
     if (resize) {
       this.width = this.sImage.width;
@@ -277,8 +278,10 @@ class SpritesManager {
     let p = new Promise((resolve, reject) => {
       let sprite = new Image();
       sprite.src = path;
+
       sprite.onload = () => {
         this.sprites.push({ name, sprite });
+        console.log("loaded sprite: " + name);
         resolve();
       };
     });
@@ -384,6 +387,10 @@ class InputManager {
 
 class SceneManager {
   //the scene manager is responsible for loading, unloading and switching scenes, it is explained in more detail in the blog and wiki
+  constructor(engine) {
+    this.engine = engine;
+  }
+
   engine;
   activeScene = null;
 
@@ -439,18 +446,77 @@ class SceneManager {
   }
 }
 
-// class Level {
-//   //the level class is a simple container for the level data
-//   constructor(name, background, foreground, levelData) {
-//     this.name = name;
-//     this.gameObjects = levelData;
-//   }
+class Levelmanager {
+  //the level manager is responsible for loading, unloading and switching levels
+  constructor(engine) {
+    this.engine = engine;
+  }
 
-//   name;
-//   background;
-//   foreground;
-//   levelData;
-// }
+  engine;
+  levels = [];
+
+  LoadLevel = async (name, path) => {
+    let level = new Level(this.engine, name, path);
+    let lvl = await level.LoadLevel();
+    this.levels.push(lvl);
+    return lvl;
+  };
+}
+
+class Level {
+  //the level class is a simple container for the level data
+  constructor(engine, name, path) {
+    this.engine = engine;
+    this.name = name;
+    this.path = path;
+  }
+
+  async LoadLevel() {
+    console.log("Loading Level");
+    let p = new Promise((resolve, reject) => {
+      require([this.path], () => {
+        let levelData = getLevel().gameObjects;
+        console.log("Level Loaded");
+        processLevel(levelData);
+      });
+
+      // process the level data asynchronously
+      const processLevel = async (levelData) => {
+        let objects = [];
+        let images = [];
+        for (let object of levelData) {
+          console.log("Processing object: ", object.imageName);
+          let img = object.imageB64;
+          if (!images.find((x) => x == img)) {
+            images.push(img);
+            await this.engine.spritesManager.LoadSprite(
+              object.imageName,
+              object.imageB64
+            );
+          }
+          objects.push({
+            x: object.x,
+            y: object.y,
+            scaleX: object?.scaleX || 1,
+            scaleY: object?.scaleY || 1,
+            rotation: object?.rotation || 0,
+            name: object.name,
+            imageName: object?.imageName || null,
+          });
+        }
+        this.levelData = objects;
+        resolve(this.levelData);
+      };
+    });
+
+    return p;
+  }
+
+  engine;
+  name;
+  path;
+  levelData;
+}
 
 // SECTION Game Engine ---------------------------------------------
 
@@ -466,8 +532,8 @@ class Engine {
     }
     this.resizeCanvas();
 
-    this.sceneManager = new SceneManager();
-    this.sceneManager.engine = this;
+    this.levelManager = new Levelmanager(this);
+    this.sceneManager = new SceneManager(this);
     this.particleManager = new ParticleSystem();
     this.spritesManager = new SpritesManager();
     this.audioManager = new AudioManager();

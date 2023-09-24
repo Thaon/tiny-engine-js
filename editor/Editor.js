@@ -292,11 +292,14 @@ container.addEventListener("keydown", function (e) {
       };
       flatten(toSave.children);
       let a = document.createElement("a");
-      let file = new Blob([JSON.stringify({ gameObjects: children })], {
-        type: "text/plain",
+      let jsToExport = `const getLevel = () => { return { gameObjects: 
+        ${JSON.stringify(children)}
+     } }`;
+      let file = new Blob([jsToExport], {
+        type: "text/javascript",
       });
       a.href = URL.createObjectURL(file);
-      a.download = "Level.json";
+      a.download = "Level.js";
       a.click();
       break;
   }
