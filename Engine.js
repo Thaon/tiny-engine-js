@@ -15,53 +15,27 @@ class GameObject {
    * @param {number} x
    * @param {number} y
    * @param {number} z
+   * @param {number} width
+   * @param {number} height
    * @param {number} rotation
-   * @param {string} imageSRC
-   * @param {PhysicsBodyType} bodyType
    */
-  constructor(engine, name, x, y, z, rotation, imageSRC, bodyType = null) {
+  constructor(engine, name, x, y, z, width, height, rotation) {
     this.engine = engine;
     this.name = name;
-    this.z = z;
     this.x = x;
     this.y = y;
+    this.z = z;
+    this.width = width;
+    this.height = height;
     this.rotation = rotation;
-    if (imageSRC != null) {
-      this.sImage = new Image();
-      this.sImage.src = imageSRC;
-    }
-
-    // generate physics with matter.js
-    if (bodyType != null) {
-      switch (bodyType.type) {
-        case "box":
-          this.body = Matter.Bodies.rectangle(
-            x,
-            y,
-            bodyType.width,
-            bodyType.height,
-            { isStatic: bodyType.static }
-          );
-          this.body.width = bodyType.width;
-          this.body.height = bodyType.height;
-          break;
-        case "circle":
-          this.body = Matter.Bodies.circle(x, y, bodyType.radius, {
-            isStatic: bodyType.static,
-          });
-          this.body.radius = bodyType.radius;
-          break;
-        default:
-          this.body = null;
-          break;
-      }
-    }
   }
 
   name;
   x;
   y;
   z;
+  width;
+  height;
   rotation;
   sImage;
   body;
@@ -78,28 +52,51 @@ class GameObject {
 
   OnCollision = (collider) => {}; //gets called by the engine whenever this object is colliding with another one, in the CollisionDetection() function
 
+  SetSprite = (name, resize = false) => {
+    this.sImage = this.engine.spritesManager.GetSprite(name);
+    if (resize) {
+      this.width = this.sImage.width;
+      this.height = this.sImage.height;
+    }
+  };
+
+  SetRigidBody = (bodyType) => {
+    // generate physics with matter.js
+    switch (bodyType.type) {
+      case "box":
+        this.body = Matter.Bodies.rectangle(
+          this.x,
+          this.y,
+          bodyType.width,
+          bodyType.height,
+          { isStatic: bodyType.static }
+        );
+        this.body.width = bodyType.width;
+        this.body.height = bodyType.height;
+        break;
+      case "circle":
+        this.body = Matter.Bodies.circle(this.x, this.y, bodyType.radius, {
+          isStatic: bodyType.static,
+        });
+        this.body.radius = bodyType.radius;
+        break;
+      default:
+        this.body = null;
+        break;
+    }
+  };
+
   Render = (delta) => {
     //gets called every tick by the engine, just before the particle systems are rendered
     if (this.sImage != null) {
-      if (this.body != null) {
-        this.engine.drawImageRotated(
-          this.sImage,
-          this.x,
-          this.y,
-          this.body?.width || this.body.radius * 2,
-          this.body?.height || this.body.radius * 2,
-          this.rotation
-        );
-      } else {
-        this.engine.drawImageRotated(
-          this.sImage,
-          this.x,
-          this.y,
-          this.sImage.width,
-          this.sImage.height,
-          this.rotation
-        );
-      }
+      this.engine.drawImageRotated(
+        this.sImage,
+        this.x,
+        this.y,
+        this.width,
+        this.height,
+        this.rotation
+      );
     }
   };
 
@@ -119,19 +116,10 @@ class GameObject {
   };
 
   GetSize = () => {
-    let dim = { width: 0, height: 0 };
-    if (this.body != null) {
-      dim = {
-        width: this.body?.radius * 2 || this.body.width,
-        height: this.body?.radius * 2 || this.body.height,
-      };
-      return dim;
-    }
-    dim = {
-      width: this.sImage.width,
-      height: this.sImage.height,
+    return {
+      width: this.width,
+      height: this.height,
     };
-    return dim;
   };
 
   AddForce = (x, y) => {
@@ -279,6 +267,32 @@ class ParticleSystem {
   RandomRange = (min, max) => {
     return Math.random() * (max - min) + min;
   };
+}
+
+class SpritesManager {
+  //the sprites manager takes care of loading, storing and drawing sprites, it is explained in more detail in the blog and wiki
+  sprites = [];
+
+  async LoadSprite(name, path) {
+    let p = new Promise((resolve, reject) => {
+      let sprite = new Image();
+      sprite.src = path;
+      sprite.onload = () => {
+        this.sprites.push({ name, sprite });
+        resolve();
+      };
+    });
+
+    return p;
+  }
+
+  GetSprite(name) {
+    for (let i = 0; i < this.sprites.length; i++) {
+      if (this.sprites[i].name == name) {
+        return this.sprites[i].sprite;
+      }
+    }
+  }
 }
 
 class AudioManager {
@@ -455,6 +469,7 @@ class Engine {
     this.sceneManager = new SceneManager();
     this.sceneManager.engine = this;
     this.particleManager = new ParticleSystem();
+    this.spritesManager = new SpritesManager();
     this.audioManager = new AudioManager();
     this.inputManager = new InputManager();
     this.physicsEngine = Matter.Engine.create();
@@ -557,14 +572,16 @@ class Engine {
     //simple AABB collision check that notifies colliders of the collision
     for (var i = 0; i < this.sceneManager.activeScene.length - 1; i++) {
       var coll1 = this.sceneManager.activeScene[i];
+      coll1Size = coll1.GetSize();
       for (var j = i; j < this.sceneManager.activeScene.length; j++) {
         var coll2 = this.sceneManager.activeScene[j];
+        coll2Size = coll2.GetSize();
         //check for AABB collisions
         if (
-          coll1.x + coll1.sImage.width > coll2.x &&
-          coll1.y + coll1.sImage.height > coll2.y &&
-          coll1.x < coll2.x + coll2.sImage.width &&
-          coll1.y < coll2.y + coll2.sImage.height
+          coll1.x + coll1Size.width > coll2.x &&
+          coll1.y + coll1Size.height > coll2.y &&
+          coll1.x < coll2.x + coll2Size.width &&
+          coll1.y < coll2.y + coll2Size.height
         ) {
           //notify colliders
           coll1.OnCollision(coll2);
@@ -582,21 +599,12 @@ class Engine {
    * @param {number} x
    * @param {number} y
    * @param {number} z
+   * @param {number} width
+   * @param {number} height
    * @param {number} rotation
-   * @param {string} imageSRC
-   * @param {PhysicsBodyType} bodyType
    */
-  AddGameObject = (name, x, y, z, rotation, imageSRC, bodyType = null) => {
-    let object = new GameObject(
-      this,
-      name,
-      x,
-      y,
-      z,
-      rotation,
-      imageSRC,
-      bodyType
-    );
+  AddGameObject = (name, x, y, z, width, height, rotation) => {
+    let object = new GameObject(this, name, x, y, z, width, height, rotation);
 
     return object;
   };

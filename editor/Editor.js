@@ -16,6 +16,17 @@ container.focus();
 // then create layer
 let layer = new Konva.Layer();
 
+// add text at 0, 0
+let text = new Konva.Text({
+  text: "+",
+  fontSize: 30,
+  fontFamily: "Calibri",
+  fill: "grey",
+});
+text.x(-text.width() / 2);
+text.y(-text.height() / 2);
+layer.add(text);
+
 // // create our shape
 // let circle = new Konva.Circle({
 //   x: stage.width() / 2,
@@ -73,7 +84,7 @@ stage.on("click tap", function (e) {
   }
 });
 
-var group = new Konva.Group();
+let group = new Konva.Group();
 layer.add(group);
 
 // Zoom
@@ -113,7 +124,7 @@ stage.on("wheel", (e) => {
 // Editor Utils
 container.addEventListener("keydown", function (e) {
   let char = String.fromCharCode(e.keyCode);
-  var pointerPos = group.getRelativePointerPosition();
+  let pointerPos = group.getRelativePointerPosition();
 
   // change z index
   if (parseInt(char) >= 0 && parseInt(char) <= 9) {
@@ -137,28 +148,30 @@ container.addEventListener("keydown", function (e) {
     case "C":
       // if we have a selection of a single node, we customize it
       if (tr.nodes().length == 1) {
-        let nodePos = tr.nodes()[0].getAbsolutePosition();
+        let nodePos = tr.nodes()[0].getPosition();
         if (tr.nodes()[0].className == "Image" || tr.nodes()[0].name() != "")
           return;
         // get image path from file explorer
-        var f = document.createElement("input");
+        let f = document.createElement("input");
         f.style.display = "none";
         f.type = "file";
         f.name = "file";
         document.getElementById("container").appendChild(f);
         f.click();
         f.onchange = function () {
-          var file = f.files[0];
-          var reader = new FileReader();
+          let file = f.files[0];
+          let reader = new FileReader();
           reader.onload = function (e) {
-            var img = new Image();
+            let img = new Image();
             img.src = e.target.result;
             img.onload = function () {
-              var image = new Konva.Image({
+              let image = new Konva.Image({
                 x: nodePos.x - img.width / 2,
                 y: nodePos.y - img.height / 2,
                 image: img,
                 draggable: true,
+                imageB64: e.target.result,
+                imageName: file.name.split(".")[0],
               });
               tr.nodes()[0].destroy();
               tr.nodes([image]);
@@ -245,7 +258,7 @@ container.addEventListener("keydown", function (e) {
         node.draggable(false);
         node.name(name);
         // add text and group them
-        var text = new Konva.Text({
+        let text = new Konva.Text({
           x: node.x(),
           y: node.y() + node.height() + 10,
           text: name,
@@ -272,14 +285,14 @@ container.addEventListener("keydown", function (e) {
             if (child.children) {
               flatten(child.children);
             }
-            if (child.attrs?.name != null) children.push(child.attrs);
+            if (child.className == "Image" || child.attrs?.name != null)
+              children.push(child.attrs);
           });
         }
       };
       flatten(toSave.children);
-      console.log(children);
-      var a = document.createElement("a");
-      var file = new Blob([JSON.stringify({ gameObjects: children })], {
+      let a = document.createElement("a");
+      let file = new Blob([JSON.stringify({ gameObjects: children })], {
         type: "text/plain",
       });
       a.href = URL.createObjectURL(file);
