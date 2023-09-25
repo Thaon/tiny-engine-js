@@ -101,12 +101,11 @@ async function StartGame() {
     );
     obj.SetSprite(object.imageName, true);
 
-    // setup physics for the ship
-    if (object.imageName == "Ship") {
+    // setup physics for the asteroid
+    if (object.imageName == "Asteroid") {
       obj.SetRigidBody({
-        type: "box",
-        width: "auto",
-        height: "auto",
+        type: "circle",
+        radius: "auto",
         static: false,
       });
       obj.OnTouch = () => {
@@ -116,6 +115,33 @@ async function StartGame() {
         // forward points right, let's rotate it by -90 degrees
         let rotated = Matter.Vector.rotate(forward, -Math.PI / 2);
         obj.AddForce(Matter.Vector.mult(rotated, 0.01));
+      };
+    }
+
+    // setup physics for the ship
+    if (object.imageName == "Ship") {
+      obj.SetRigidBody({
+        type: "box",
+        width: "auto",
+        height: "auto",
+        static: false,
+      });
+
+      obj.Update = (delta) => {
+        if (engine.inputManager.OnTouch()) {
+          // seek the mouse position
+          let mousePos = engine.inputManager.GetMousePosition();
+          let desiredVelocity = Matter.Vector.sub(mousePos, obj.GetPos());
+          desiredVelocity = Matter.Vector.normalise(desiredVelocity);
+          desiredVelocity = Matter.Vector.mult(desiredVelocity, 0.01);
+          obj.AddForce(desiredVelocity);
+          // rotate towards the velocity
+          let velocity = Matter.Vector.normalise(obj.GetVelocity());
+          let angle = Matter.Vector.angle(velocity, obj.GetForwardVector(true));
+          angleDeg = (angle * 180) / Math.PI;
+          // rotate the object to align with the velocity vector
+          obj.SetRotation(angleDeg);
+        }
       };
     }
 

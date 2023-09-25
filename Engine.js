@@ -70,19 +70,24 @@ class GameObject {
   SetRigidBody = (bodyType) => {
     // handle physics with matter.js
 
-    // get width and height
-    let width =
-      bodyType.width == "auto" ? this.width : bodyType.radius || bodyType.width;
-    let height =
-      bodyType.height == "auto"
-        ? this.height
-        : bodyType.radius || bodyType.height;
+    // get width and height or radius
+    let width = bodyType.width == "auto" ? this.width : bodyType.width;
+    let height = bodyType.height == "auto" ? this.height : bodyType.height;
+    let radius =
+      bodyType.radius == "auto"
+        ? Math.max(this.width, this.height) / 2
+        : bodyType.radius;
     // apply scaling
     width *= this.scaleX;
     height *= this.scaleY;
+    radius *= Math.max(this.scaleX, this.scaleY);
     // center x and y
     let x = this.x + width / 2;
     let y = this.y + height / 2;
+    if (bodyType.type == "circle") {
+      x = this.x + radius;
+      y = this.y + radius;
+    }
     // process body type
     switch (bodyType.type) {
       case "box":
@@ -93,10 +98,10 @@ class GameObject {
         this.body.height = height;
         break;
       case "circle":
-        this.body = Matter.Bodies.circle(x, y, bodyType.radius, {
+        this.body = Matter.Bodies.circle(x, y, radius, {
           isStatic: bodyType.static,
         });
-        this.body.radius = bodyType.radius;
+        this.body.radius = radius;
         break;
       default:
         this.body = null;
@@ -106,7 +111,10 @@ class GameObject {
     let rotationRad = (this.rotation * Math.PI) / 180;
     Matter.Body.setAngle(this.body, rotationRad);
     // set body offset for later rendering
-    this.bodyOffset = { x: width, y: height };
+    this.bodyOffset = {
+      x: this.body.radius ? radius * 2 : width,
+      y: this.body.radius ? radius * 2 : height,
+    };
   };
 
   Render = (delta) => {
@@ -134,11 +142,19 @@ class GameObject {
     this.y = newY;
   };
 
+  SetRotation = (newRotation) => {
+    this.rotation = newRotation;
+    if (this.body != null) {
+      let rotationRad = (this.rotation * Math.PI) / 180;
+      Matter.Body.setAngle(this.body, rotationRad);
+    }
+  };
+
   GetPos = () => {
-    var pos = [];
-    pos[0] = this.x;
-    pos[1] = this.y;
-    return pos;
+    return {
+      x: this.x,
+      y: this.y,
+    };
   };
 
   GetSize = () => {
@@ -148,12 +164,22 @@ class GameObject {
     };
   };
 
-  GetForwardVector = () => {
+  GetForwardVector = (adjustUp = false) => {
     let rotationRad = (this.rotation * Math.PI) / 180;
-    return {
+    if (adjustUp) rotationRad -= Math.PI / 2;
+    return Matter.Vector.normalise({
       x: Math.cos(rotationRad),
       y: Math.sin(rotationRad),
-    };
+    });
+  };
+
+  GetVelocity = () => {
+    if (this.body != null) return this.body.velocity;
+    else
+      return {
+        x: 0,
+        y: 0,
+      };
   };
 
   AddForce = ({ x, y }) => {
@@ -364,40 +390,62 @@ class AudioManager {
 class InputManager {
   lastPt = null;
   activeScene;
+  touching = false;
+  lastEvent = null;
+
+  GetMousePosition = () => {
+    return this.lastPt;
+  };
 
   init = (canvas) => {
     canvas.addEventListener("touchstart", this.touchDown, false);
-    canvas.addEventListener("touchmove", this.touchXY, true);
+    canvas.addEventListener("touchmove", this.UpdateTouchEvent, false);
     canvas.addEventListener("touchend", this.touchUp, false);
 
     document.body.addEventListener("touchcancel", this.touchUp, false);
   };
 
+  UpdateTouchEvent = (evt) => {
+    evt.preventDefault();
+    this.lastEvent = evt;
+  };
+
   touchUp = (evt) => {
     evt.preventDefault();
+    this.touching = false;
 
     this.checkClick("OnTouchUp");
 
     // Terminate touch path
     this.lastPt = null;
+    return this.lastPt;
   };
 
   touchDown = (evt) => {
     //joke to be made aout american football is unfortunately missing
     evt.preventDefault();
     this.lastPt = { x: evt.touches[0].pageX, y: evt.touches[0].pageY };
+    this.touching = true;
+    this.lastEvent = evt;
 
     //we also check if we clicked on an object
     this.checkClick("OnTouchDown");
+    return this.lastPt;
   };
 
-  touchXY = (evt) => {
+  OnTouch = () => {
     //other than setting up our last touched position
-    evt.preventDefault();
-    this.lastPt = { x: evt.touches[0].pageX, y: evt.touches[0].pageY };
+    if (!this.lastEvent) return false;
+    this.lastEvent.preventDefault();
+    if (!this.touching || this.lastEvent.touches.length == 0) return false;
+    this.lastPt = {
+      x: this.lastEvent.touches[0].pageX,
+      y: this.lastEvent.touches[0].pageY,
+    };
 
     //we also check if we clicked on an object
     this.checkClick("OnTouch");
+    return this.lastPt;
   };
 
   checkClick = (method) => {
@@ -618,6 +666,8 @@ class Engine {
 
   gameLoop = () => {
     let elapsed = (Date.now() - this.startTimeMS) / 1000;
+
+    if (this.inputManager.touching) this.inputManager.OnTouch();
 
     this.sceneManager.UpdateScene(elapsed);
     this.collisionDetection();
