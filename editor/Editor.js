@@ -148,6 +148,11 @@ container.addEventListener("keydown", function (e) {
     case "C":
       // if we have a selection of a single node, we customize it
       if (tr.nodes().length == 1) {
+        console.log(
+          tr.nodes()[0].position(),
+          tr.nodes()[0].getTransform(),
+          tr.nodes()[0].offset()
+        );
         let nodePos = tr.nodes()[0].getPosition();
         if (tr.nodes()[0].className == "Image" || tr.nodes()[0].name() != "")
           return;

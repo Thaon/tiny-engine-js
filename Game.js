@@ -75,12 +75,12 @@ async function StartGame() {
   const engine = new Engine();
   const level = await engine.levelManager.LoadLevel(
     "test",
-    "./assets/Level2.js"
+    "./assets/Level3.js"
   );
 
   // check that things are good
-  console.log(level);
-  console.log(engine.spritesManager.sprites);
+  // console.log(level);
+  // console.log(engine.spritesManager.sprites);
 
   // setup scene and add gameobjects
   const scene = engine.sceneManager.AddScene("game");
@@ -93,13 +93,12 @@ async function StartGame() {
       1,
       100,
       100,
-      object.rotation
+      object.rotation,
+      object.scaleX,
+      object.scaleY
     );
     obj.SetSprite(object.imageName, true);
-    // remember to offset the objects as they come in centered while here they are not
-    obj.x += obj.width / 2;
-    obj.y += obj.height / 2;
-    console.log(obj);
+
     // we add objects silently because this does not call the Start method on them
     scene.AddSilently(obj);
   });

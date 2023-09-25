@@ -18,8 +18,10 @@ class GameObject {
    * @param {number} width
    * @param {number} height
    * @param {number} rotation
+   * @param {number} scaleX
+   * @param {number} scaleY
    */
-  constructor(engine, name, x, y, z, width, height, rotation) {
+  constructor(engine, name, x, y, z, width, height, rotation, scaleX, scaleY) {
     this.engine = engine;
     this.name = name;
     this.x = x;
@@ -28,6 +30,8 @@ class GameObject {
     this.width = width;
     this.height = height;
     this.rotation = rotation;
+    this.scaleX = scaleX;
+    this.scaleY = scaleY;
   }
 
   name;
@@ -37,6 +41,8 @@ class GameObject {
   width;
   height;
   rotation;
+  scaleX;
+  scaleY;
   sImage;
   body;
   engine;
@@ -53,7 +59,6 @@ class GameObject {
   OnCollision = (collider) => {}; //gets called by the engine whenever this object is colliding with another one, in the CollisionDetection() function
 
   SetSprite = (name, resize = false) => {
-    console.log(name, this.engine.spritesManager);
     this.sImage = this.engine.spritesManager.GetSprite(name);
     if (resize) {
       this.width = this.sImage.width;
@@ -90,13 +95,15 @@ class GameObject {
   Render = (delta) => {
     //gets called every tick by the engine, just before the particle systems are rendered
     if (this.sImage != null) {
-      this.engine.drawImageRotated(
+      this.engine.drawImageExt(
         this.sImage,
         this.x,
         this.y,
         this.width,
         this.height,
-        this.rotation
+        this.rotation,
+        this.scaleX,
+        this.scaleY
       );
     }
   };
@@ -281,7 +288,6 @@ class SpritesManager {
 
       sprite.onload = () => {
         this.sprites.push({ name, sprite });
-        console.log("loaded sprite: " + name);
         resolve();
       };
     });
@@ -472,11 +478,9 @@ class Level {
   }
 
   async LoadLevel() {
-    console.log("Loading Level");
     let p = new Promise((resolve, reject) => {
       require([this.path], () => {
         let levelData = getLevel().gameObjects;
-        console.log("Level Loaded");
         processLevel(levelData);
       });
 
@@ -485,7 +489,6 @@ class Level {
         let objects = [];
         let images = [];
         for (let object of levelData) {
-          console.log("Processing object: ", object.imageName);
           let img = object.imageB64;
           if (!images.find((x) => x == img)) {
             images.push(img);
@@ -668,32 +671,44 @@ class Engine {
    * @param {number} width
    * @param {number} height
    * @param {number} rotation
+   * @param {number} scaleX
+   * @param {number} scaleY
    */
-  AddGameObject = (name, x, y, z, width, height, rotation) => {
-    let object = new GameObject(this, name, x, y, z, width, height, rotation);
+  AddGameObject = (name, x, y, z, width, height, rotation, scaleX, scaleY) => {
+    let object = new GameObject(
+      this,
+      name,
+      x,
+      y,
+      z,
+      width,
+      height,
+      rotation,
+      scaleX,
+      scaleY
+    );
 
     return object;
   };
 
-  drawImage = (image, x, y) => {
+  drawImage = (image, x, y, centered = false) => {
     this.canvasContext.save();
     this.canvasContext.translate(x, y);
+    if (centered)
+      this.canvasContext.translate(image.width / 2, image.height / 2);
     this.canvasContext.drawImage(image, 0, 0);
     this.canvasContext.restore();
   };
 
-  drawImageSize = (image, x, y, width, height) => {
+  drawImageExt = (image, x, y, width, height, angle, scaleX, scaleY) => {
     this.canvasContext.save();
+    // translate to origin, then rotate
     this.canvasContext.translate(x, y);
+    let angleRad = (angle * Math.PI) / 180;
+    this.canvasContext.rotate(angleRad); // this is needed by the level editor
+    //transpose angle from degrees to radians
+    this.canvasContext.scale(scaleX, scaleY);
     this.canvasContext.drawImage(image, 0, 0, width, height);
-    this.canvasContext.restore();
-  };
-
-  drawImageRotated = (image, x, y, width, height, angle) => {
-    this.canvasContext.save();
-    this.canvasContext.translate(x, y);
-    this.canvasContext.rotate(angle);
-    this.canvasContext.drawImage(image, -width / 2, -height / 2, width, height);
     this.canvasContext.restore();
   };
 
