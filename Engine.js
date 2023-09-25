@@ -46,6 +46,7 @@ class GameObject {
   sImage;
   body;
   engine;
+  bodyOffset = { x: 0, y: 0 };
 
   // Methods
   Start = () => {}; //will be overridden by derivative classes, gets called once every time the InitScene() function is called
@@ -67,21 +68,32 @@ class GameObject {
   };
 
   SetRigidBody = (bodyType) => {
-    // generate physics with matter.js
+    // handle physics with matter.js
+
+    // get width and height
+    let width =
+      bodyType.width == "auto" ? this.width : bodyType.radius || bodyType.width;
+    let height =
+      bodyType.height == "auto"
+        ? this.height
+        : bodyType.radius || bodyType.height;
+    // apply scaling
+    width *= this.scaleX;
+    height *= this.scaleY;
+    // center x and y
+    let x = this.x + width / 2;
+    let y = this.y + height / 2;
+    // process body type
     switch (bodyType.type) {
       case "box":
-        this.body = Matter.Bodies.rectangle(
-          this.x,
-          this.y,
-          bodyType.width,
-          bodyType.height,
-          { isStatic: bodyType.static }
-        );
-        this.body.width = bodyType.width;
-        this.body.height = bodyType.height;
+        this.body = Matter.Bodies.rectangle(x, y, width, height, {
+          isStatic: bodyType.static,
+        });
+        this.body.width = width;
+        this.body.height = height;
         break;
       case "circle":
-        this.body = Matter.Bodies.circle(this.x, this.y, bodyType.radius, {
+        this.body = Matter.Bodies.circle(x, y, bodyType.radius, {
           isStatic: bodyType.static,
         });
         this.body.radius = bodyType.radius;
@@ -90,6 +102,11 @@ class GameObject {
         this.body = null;
         break;
     }
+    // rotate body to match rotation
+    let rotationRad = (this.rotation * Math.PI) / 180;
+    Matter.Body.setAngle(this.body, rotationRad);
+    // set body offset for later rendering
+    this.bodyOffset = { x: width, y: height };
   };
 
   Render = (delta) => {
@@ -103,7 +120,8 @@ class GameObject {
         this.height,
         this.rotation,
         this.scaleX,
-        this.scaleY
+        this.scaleY,
+        this.bodyOffset
       );
     }
   };
@@ -130,7 +148,15 @@ class GameObject {
     };
   };
 
-  AddForce = (x, y) => {
+  GetForwardVector = () => {
+    let rotationRad = (this.rotation * Math.PI) / 180;
+    return {
+      x: Math.cos(rotationRad),
+      y: Math.sin(rotationRad),
+    };
+  };
+
+  AddForce = ({ x, y }) => {
     if (this.body != null)
       Matter.Body.applyForce(
         this.body,
@@ -418,13 +444,16 @@ class SceneManager {
 
   UpdateScene(delta) {
     this.activeScene.objects.forEach(function (object) {
-      // first we process physics
+      // first we call Update
+      object?.Update(delta);
+      // then we process physics
       if (object.body != null) {
         object.x = object.body.position.x;
         object.y = object.body.position.y;
-        object.rotation = object.body.angle;
+        // always switch between deg and rad
+        let bodyAngleDeg = (object.body.angle * 180) / Math.PI;
+        object.rotation = bodyAngleDeg;
       }
-      object?.Update(delta);
     });
   }
 
@@ -700,15 +729,30 @@ class Engine {
     this.canvasContext.restore();
   };
 
-  drawImageExt = (image, x, y, width, height, angle, scaleX, scaleY) => {
+  drawImageExt = (
+    image,
+    x,
+    y,
+    width,
+    height,
+    angle,
+    scaleX,
+    scaleY,
+    bodyOffset
+  ) => {
+    // save GL stack
     this.canvasContext.save();
     // translate to origin, then rotate
     this.canvasContext.translate(x, y);
+    //transpose angle from degrees to radians
     let angleRad = (angle * Math.PI) / 180;
     this.canvasContext.rotate(angleRad); // this is needed by the level editor
-    //transpose angle from degrees to radians
+    // check for rigidBody offset
+    this.canvasContext.translate(-bodyOffset.x / 2, -bodyOffset.y / 2);
+    // scale and draw
     this.canvasContext.scale(scaleX, scaleY);
     this.canvasContext.drawImage(image, 0, 0, width, height);
+    // restore GL stack
     this.canvasContext.restore();
   };
 

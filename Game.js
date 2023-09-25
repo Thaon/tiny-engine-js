@@ -73,6 +73,8 @@
 
 async function StartGame() {
   const engine = new Engine();
+  engine.debugPhysics = true;
+  engine.physicsEngine.gravity = { x: 0, y: 0 };
   const level = await engine.levelManager.LoadLevel(
     "test",
     "./assets/Level3.js"
@@ -98,6 +100,24 @@ async function StartGame() {
       object.scaleY
     );
     obj.SetSprite(object.imageName, true);
+
+    // setup physics for the ship
+    if (object.imageName == "Ship") {
+      obj.SetRigidBody({
+        type: "box",
+        width: "auto",
+        height: "auto",
+        static: false,
+      });
+      obj.OnTouch = () => {
+        // rotate right
+        obj.AddTorque(5);
+        let forward = obj.GetForwardVector();
+        // forward points right, let's rotate it by -90 degrees
+        let rotated = Matter.Vector.rotate(forward, -Math.PI / 2);
+        obj.AddForce(Matter.Vector.mult(rotated, 0.01));
+      };
+    }
 
     // we add objects silently because this does not call the Start method on them
     scene.AddSilently(obj);
