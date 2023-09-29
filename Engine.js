@@ -47,11 +47,13 @@ class GameObject {
   body;
   engine;
   bodyOffset = { x: 0, y: 0 };
+  matchPhysics = false;
 
   // Methods
   Start = () => {}; //will be overridden by derivative classes, gets called once every time the InitScene() function is called
 
-  Update = (delta) => {}; //will be overridden by derivative classes, gets called by the engine at every ick
+  Update = (delta) => {}; //will be overridden by derivative classes, gets called by the engine at every tick
+  PhysicsUpdate = () => {}; //will be overridden by derivative classes, gets called by the physics engine at every tick, after the Update() function
 
   OnTouchDown = () => {}; //will be overridden by derivative classes, gets called by the engine ONCE when a touch is within the boundaries of the GameObject
   OnTouch = () => {}; //will be overridden by derivative classes, gets called by the engine when a touch is within the boundaries of the GameObject
@@ -120,7 +122,7 @@ class GameObject {
   Render = (delta) => {
     //gets called every tick by the engine, just before the particle systems are rendered
     if (this.sImage != null) {
-      this.engine.drawImageExt(
+      this.engine.__drawImageExt(
         this.sImage,
         this.x,
         this.y,
@@ -142,10 +144,15 @@ class GameObject {
     this.y = newY;
   };
 
-  SetRotation = (newRotation) => {
-    this.rotation = newRotation;
+  SetRotationRad = (newRotation) => {
     if (this.body != null) {
-      let rotationRad = (this.rotation * Math.PI) / 180;
+      Matter.Body.setAngle(this.body, newRotation);
+    }
+  };
+
+  SetRotationDeg = (newRotation) => {
+    if (this.body != null) {
+      let rotationRad = (newRotation * Math.PI) / 180;
       Matter.Body.setAngle(this.body, rotationRad);
     }
   };
@@ -165,12 +172,24 @@ class GameObject {
   };
 
   GetForwardVector = (adjustUp = false) => {
-    let rotationRad = (this.rotation * Math.PI) / 180;
-    if (adjustUp) rotationRad -= Math.PI / 2;
-    return Matter.Vector.normalise({
-      x: Math.cos(rotationRad),
-      y: Math.sin(rotationRad),
-    });
+    let rotation = this.rotation;
+    let forwardVector = {
+      x: 1,
+      y: 0,
+    };
+    if (adjustUp) {
+      forwardVector = {
+        x: 0,
+        y: -1,
+      };
+    }
+    let rotationRad = (rotation * Math.PI) / 180;
+    // check that angle is not flipped
+    forwardVector = Matter.Vector.rotate(forwardVector, rotationRad);
+    forwardVector = Matter.Vector.normalise(forwardVector);
+    forwardVector.x = parseFloat(forwardVector.x.toFixed(3));
+    forwardVector.y = parseFloat(forwardVector.y.toFixed(3));
+    return forwardVector;
   };
 
   GetVelocity = () => {
@@ -495,7 +514,7 @@ class SceneManager {
       // first we call Update
       object?.Update(delta);
       // then we process physics
-      if (object.body != null) {
+      if (object.body != null && object.matchPhysics) {
         object.x = object.body.position.x;
         object.y = object.body.position.y;
         // always switch between deg and rad
@@ -638,6 +657,10 @@ class Engine {
   physicsEngine;
   physicsRunner;
 
+  // direct drawing
+  lines = [];
+  texts = [];
+
   resizeCanvas = () => {
     this.canvas.width = window.innerWidth;
     this.canvas.height = window.innerHeight;
@@ -660,6 +683,8 @@ class Engine {
 
     this.physicsRunner = Matter.Runner.create();
     Matter.Runner.run(this.physicsRunner, this.physicsEngine);
+    Matter.Events.on(this.physicsEngine, "beforeUpdate", this.updatePhysics);
+    Matter.Events.on(this.physicsEngine, "collisionEnd", this.collisionPhysics);
 
     this.gameLoop();
   };
@@ -677,6 +702,30 @@ class Engine {
     requestAnimationFrame(this.gameLoop);
   };
 
+  updatePhysics = () => {
+    this.sceneManager.activeScene.objects.forEach(function (object) {
+      object?.PhysicsUpdate();
+    });
+  };
+
+  collisionPhysics = (event) => {
+    if (event.pairs.length > 0) {
+      event.pairs.forEach((pair) => {
+        let bodyA = pair.bodyA;
+        let bodyB = pair.bodyB;
+        let gameObjectA = null;
+        let gameObjectB = null;
+        this.sceneManager.activeScene.objects.forEach((object) => {
+          if (object.body == bodyA) gameObjectA = object;
+          if (object.body == bodyB) gameObjectB = object;
+        });
+
+        if (gameObjectA != null) gameObjectA.OnCollision(gameObjectB);
+        if (gameObjectB != null) gameObjectB.OnCollision(gameObjectA);
+      });
+    }
+  };
+
   render = (delta) => {
     this.canvasContext.clearRect(0, 0, this.canvas.width, this.canvas.height);
     this.canvasContext.fillRect(0, 0, this.canvas.width, this.canvas.height);
@@ -690,8 +739,25 @@ class Engine {
     //render particle systems on top
     this.particleManager.renderParticles(this.canvasContext);
 
-    //finally render GUI
+    //render GUI
     this.sceneManager.RenderGUI(delta);
+
+    // render all texts
+
+    // render all lines
+    this.lines.forEach((line) => {
+      this.__drawLine(
+        line.x1,
+        line.y1,
+        line.x2,
+        line.y2,
+        line.color,
+        line.width
+      );
+    });
+
+    // clear texts and lines for next render cycle
+    this.lines = [];
   };
 
   debugRenderPhysics = () => {
@@ -770,7 +836,7 @@ class Engine {
     return object;
   };
 
-  drawImage = (image, x, y, centered = false) => {
+  __drawImage = (image, x, y, centered = false) => {
     this.canvasContext.save();
     this.canvasContext.translate(x, y);
     if (centered)
@@ -779,7 +845,20 @@ class Engine {
     this.canvasContext.restore();
   };
 
-  drawImageExt = (
+  drawLine = (x1, y1, x2, y2, color = "#fff", width = 1) => {
+    this.lines.push({ x1, y1, x2, y2, color, width });
+  };
+
+  __drawLine = (x1, y1, x2, y2, color = "#fff", width = 1) => {
+    this.canvasContext.beginPath();
+    this.canvasContext.moveTo(x1, y1);
+    this.canvasContext.lineTo(x2, y2);
+    this.canvasContext.lineWidth = width;
+    this.canvasContext.strokeStyle = color;
+    this.canvasContext.stroke();
+  };
+
+  __drawImageExt = (
     image,
     x,
     y,

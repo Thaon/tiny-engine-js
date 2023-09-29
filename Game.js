@@ -100,6 +100,8 @@ async function StartGame() {
       object.scaleY
     );
     obj.SetSprite(object.imageName, true);
+    // we tell the engine to match the physics body to the sprite size
+    obj.matchPhysics = true;
 
     // setup physics for the asteroid
     if (object.imageName == "Asteroid") {
@@ -127,7 +129,7 @@ async function StartGame() {
         static: false,
       });
 
-      obj.Update = (delta) => {
+      obj.PhysicsUpdate = () => {
         if (engine.inputManager.OnTouch()) {
           // seek the mouse position
           let mousePos = engine.inputManager.GetMousePosition();
@@ -137,10 +139,32 @@ async function StartGame() {
           obj.AddForce(desiredVelocity);
           // rotate towards the velocity
           let velocity = Matter.Vector.normalise(obj.GetVelocity());
-          let angle = Matter.Vector.angle(velocity, obj.GetForwardVector(true));
-          angleDeg = (angle * 180) / Math.PI;
+
+          // draw line to show desired velocity vector with engine.drawLine(x1, y1, x2, y2, color = "#fff", width = 1)
+          engine.drawLine(
+            obj.GetPos().x,
+            obj.GetPos().y,
+            mousePos.x,
+            mousePos.y,
+            "#0f0",
+            4
+          );
+
+          //draw line to show velocity vector with engine.drawLine(x1, y1, x2, y2, color = "#fff", width = 1)
+          engine.drawLine(
+            obj.GetPos().x,
+            obj.GetPos().y,
+            obj.GetPos().x + obj.GetVelocity().x * 10,
+            obj.GetPos().y + obj.GetVelocity().y * 10,
+            "#f00",
+            4
+          );
+
+          let angleRad = Math.atan2(velocity.y, velocity.x);
+          // rotate 90 degrees as the forward vector is pointing right
+          angleRad += Math.PI / 2;
           // rotate the object to align with the velocity vector
-          obj.SetRotation(angleDeg);
+          obj.SetRotationRad(angleRad);
         }
       };
     }
