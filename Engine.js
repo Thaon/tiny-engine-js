@@ -407,19 +407,28 @@ class AudioManager {
 }
 
 class InputManager {
+  canvas;
+  engine;
   lastPt = null;
   activeScene;
   touching = false;
   lastEvent = null;
+  scaleFillNative;
+
+  constructor(engine) {
+    this.engine = engine;
+  }
 
   GetMousePosition = () => {
     return this.lastPt;
   };
 
   init = (canvas) => {
-    canvas.addEventListener("touchstart", this.touchDown, false);
-    canvas.addEventListener("touchmove", this.UpdateTouchEvent, false);
-    canvas.addEventListener("touchend", this.touchUp, false);
+    this.canvas = canvas;
+    //Set Event Listeners for window, mouse and touch
+    this.canvas.addEventListener("touchstart", this.touchDown, false);
+    this.canvas.addEventListener("touchmove", this.UpdateTouchEvent, false);
+    this.canvas.addEventListener("touchend", this.touchUp, false);
 
     document.body.addEventListener("touchcancel", this.touchUp, false);
   };
@@ -440,10 +449,20 @@ class InputManager {
     return this.lastPt;
   };
 
+  getMoouseCoordsAfterTransform = (evt) => {
+    let mouseX = evt.touches[0].pageX;
+    let mouseY = evt.touches[0].pageY;
+    let mouseToWorld = this.engine.viewportToWorld(mouseX, mouseY);
+    return { x: mouseToWorld.x, y: mouseToWorld.y };
+  };
+
   touchDown = (evt) => {
-    //joke to be made aout american football is unfortunately missing
+    //joke to be made about american football is unfortunately missing
     evt.preventDefault();
-    this.lastPt = { x: evt.touches[0].pageX, y: evt.touches[0].pageY };
+    // account for canvas translation
+    let mousePos = this.getMoouseCoordsAfterTransform(evt);
+    this.lastPt = { x: mousePos.x, y: mousePos.y };
+    // this.lastPt = { x: evt.touches[0].pageX, y: evt.touches[0].pageY };
     this.touching = true;
     this.lastEvent = evt;
 
@@ -457,10 +476,13 @@ class InputManager {
     if (!this.lastEvent) return false;
     this.lastEvent.preventDefault();
     if (!this.touching || this.lastEvent.touches.length == 0) return false;
-    this.lastPt = {
-      x: this.lastEvent.touches[0].pageX,
-      y: this.lastEvent.touches[0].pageY,
-    };
+    // account for canvas translation
+    let mousePos = this.getMoouseCoordsAfterTransform(this.lastEvent);
+    this.lastPt = { x: mousePos.x, y: mousePos.y };
+    // this.lastPt = {
+    //   x: this.lastEvent.touches[0].pageX,
+    //   y: this.lastEvent.touches[0].pageY,
+    // };
 
     //we also check if we clicked on an object
     this.checkClick("OnTouch");
@@ -507,6 +529,7 @@ class SceneManager {
     this.activeScene.objects.forEach(function (object) {
       object?.Start();
     });
+    this.engine.camera = new Camera(this.engine);
   }
 
   UpdateScene(delta) {
@@ -617,6 +640,62 @@ class Level {
   levelData;
 }
 
+class Camera {
+  // possibles axis to move the camera
+  AXIS = {
+    NONE: 1,
+    HORIZONTAL: 2,
+    VERTICAL: 3,
+    BOTH: 4,
+  };
+
+  constructor(engine) {
+    this.engine = engine;
+  }
+
+  engine;
+  x = 0;
+  y = 0;
+  zoom = 1;
+  rotation = 0;
+
+  // gameObject needs to have "x" and "y" properties (as world(or room) position)
+  SetPosition = (x, y) => {
+    let zoomedX = x * this.zoom;
+    let zoomedY = y * this.zoom;
+    this.x = zoomedX;
+    this.y = zoomedY;
+  };
+
+  SetRotationDeg(degrees) {
+    this.rotation = (degrees * Math.PI) / 180;
+  }
+
+  SetRotationRad(radians) {
+    this.rotation = radians;
+  }
+
+  SetZoom(zoom) {
+    this.zoom = zoom;
+  }
+
+  Update = (delta) => {
+    let originX = -(this.x - this.engine.canvas.width / 2);
+    let originY = -(this.y - this.engine.canvas.height / 2);
+    let ctx = this.engine.canvasContext;
+    // we align with 0, 0 and rotate around the center of the canvas
+    ctx.translate(this.engine.canvas.width / 2, this.engine.canvas.height / 2);
+    ctx.rotate(-this.rotation);
+    ctx.translate(
+      -this.engine.canvas.width / 2,
+      -this.engine.canvas.height / 2
+    );
+    // now we can translate and scale
+    ctx.translate(originX, originY);
+    ctx.scale(this.zoom, this.zoom);
+  };
+}
+
 // SECTION Game Engine ---------------------------------------------
 
 class Engine {
@@ -636,7 +715,7 @@ class Engine {
     this.particleManager = new ParticleSystem();
     this.spritesManager = new SpritesManager();
     this.audioManager = new AudioManager();
-    this.inputManager = new InputManager();
+    this.inputManager = new InputManager(this);
     this.physicsEngine = Matter.Engine.create();
   }
 
@@ -658,6 +737,7 @@ class Engine {
   physicsRunner;
 
   // direct drawing
+  camera;
   lines = [];
   texts = [];
 
@@ -730,6 +810,11 @@ class Engine {
     this.canvasContext.clearRect(0, 0, this.canvas.width, this.canvas.height);
     this.canvasContext.fillRect(0, 0, this.canvas.width, this.canvas.height);
 
+    this.canvasContext.save();
+
+    // render camera viewport
+    this.camera.Update();
+
     //render all GameObjects
     this.sceneManager.RenderScene(delta);
 
@@ -743,6 +828,9 @@ class Engine {
     this.sceneManager.RenderGUI(delta);
 
     // render all texts
+    this.texts.forEach((text) => {
+      this.__drawText(text.txt, text.x, text.y, text.txtColour, text.txtSize);
+    });
 
     // render all lines
     this.lines.forEach((line) => {
@@ -756,8 +844,11 @@ class Engine {
       );
     });
 
+    this.canvasContext.restore();
+
     // clear texts and lines for next render cycle
     this.lines = [];
+    this.texts = [];
   };
 
   debugRenderPhysics = () => {
@@ -837,12 +928,12 @@ class Engine {
   };
 
   __drawImage = (image, x, y, centered = false) => {
-    this.canvasContext.save();
+    // this.canvasContext.save();
     this.canvasContext.translate(x, y);
     if (centered)
       this.canvasContext.translate(image.width / 2, image.height / 2);
     this.canvasContext.drawImage(image, 0, 0);
-    this.canvasContext.restore();
+    // this.canvasContext.restore();
   };
 
   drawLine = (x1, y1, x2, y2, color = "#fff", width = 1) => {
@@ -891,5 +982,32 @@ class Engine {
     this.canvasContext.font = txtFont;
     this.canvasContext.textAlign = txtAlign;
     this.canvasContext.textBaseline = txtBaseline;
+  };
+
+  drawText = (txt, x, y, txtColour, txtSize) => {
+    this.texts.push({ txt, x, y, txtColour, txtSize });
+  };
+
+  __drawText = (txt, x, y, txtColour, txtSize) => {
+    this.canvasContext.fillStyle = txtColour;
+    this.canvasContext.font = txtSize + "px Arial";
+    // invert canvas rotation
+    this.canvasContext.rotate(this.camera.rotation);
+    let coords = this.viewportToWorld(x, y);
+    this.canvasContext.fillText(txt, coords.x, coords.y);
+    // restore canvas rotation
+    this.canvasContext.rotate(-this.camera.rotation);
+  };
+
+  viewportToWorld = (x, y) => {
+    // account for canvas translation and rotation
+    let worldX = x + this.camera.x - this.canvas.width / 2;
+    let worldY = y + this.camera.y - this.canvas.height / 2;
+
+    // account for camera zoom
+    worldX /= this.camera.zoom;
+    worldY /= this.camera.zoom;
+
+    return { x: worldX, y: worldY };
   };
 }

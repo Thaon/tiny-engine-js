@@ -129,6 +129,27 @@ async function StartGame() {
         static: false,
       });
 
+      obj.Update = (delta) => {
+        // follow camera
+        let camera = engine.camera;
+        camera.SetPosition(obj.GetPos().x, obj.GetPos().y);
+        // engine.camera.SetRotationDeg(obj.rotation);
+      };
+
+      obj.RenderGUI = () => {
+        // draw text for the camera coords
+        engine.drawText(
+          "Camera: " +
+            engine.camera.x.toFixed(0) +
+            ", " +
+            engine.camera.y.toFixed(0),
+          10,
+          40,
+          "#fff",
+          40
+        );
+      };
+
       obj.PhysicsUpdate = () => {
         if (engine.inputManager.OnTouch()) {
           // seek the mouse position
@@ -175,4 +196,6 @@ async function StartGame() {
 
   // we finally initialise the engine with the scene we want to start with
   engine.init(scene);
+
+  engine.camera.SetZoom(0.5);
 }
