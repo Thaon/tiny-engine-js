@@ -927,6 +927,18 @@ class Engine {
     return object;
   };
 
+  lerp = (a, b, alpha) => {
+    return a + alpha * (b - a);
+  };
+
+  remap = (value, low1, high1, low2, high2) => {
+    return low2 + ((high2 - low2) * (value - low1)) / (high1 - low1);
+  };
+
+  clamp = (val, min, max) => {
+    return Math.min(Math.max(val, min), max) || min;
+  };
+
   __drawImage = (image, x, y, centered = false) => {
     // this.canvasContext.save();
     this.canvasContext.translate(x, y);

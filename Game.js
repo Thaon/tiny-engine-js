@@ -134,6 +134,18 @@ async function StartGame() {
         let camera = engine.camera;
         camera.SetPosition(obj.GetPos().x, obj.GetPos().y);
         // engine.camera.SetRotationDeg(obj.rotation);
+        // set zoom based on velocity
+        let velocity = Matter.Vector.magnitudeSquared(obj.GetVelocity());
+        let maxVelocity = 100;
+        let minZoom = 0.5;
+        let maxZoom = 1.5;
+        let zoom = 1;
+        // zoom out when moving fast
+        zoom = engine.lerp(minZoom, maxZoom, 1 - velocity / maxVelocity);
+        zoom = engine.clamp(zoom, minZoom, maxZoom);
+        // smoothly zoom
+        zoom = engine.lerp(camera.zoom, zoom, 0.01);
+        camera.SetZoom(zoom);
       };
 
       obj.RenderGUI = () => {
@@ -196,6 +208,4 @@ async function StartGame() {
 
   // we finally initialise the engine with the scene we want to start with
   engine.init(scene);
-
-  engine.camera.SetZoom(0.5);
 }
