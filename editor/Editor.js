@@ -56,6 +56,7 @@ stage.on("click tap", function (e) {
   // if click on empty area - remove all selections
   if (e.target === stage) {
     tr.nodes([]);
+    if (settings?.destroy) setupToolbar();
     return;
   }
   tr.zIndex(999);
@@ -82,6 +83,11 @@ stage.on("click tap", function (e) {
     const nodes = tr.nodes().concat([toSelect]);
     tr.nodes(nodes);
   }
+
+  // if we have exactly one node, let's open the inspector
+  if (tr.nodes().length == 1) {
+    setupSettings(tr.nodes()[0]);
+  } else if (settings?.destroy) setupToolbar();
 });
 
 let group = new Konva.Group();
@@ -171,8 +177,11 @@ container.addEventListener("keydown", function (e) {
             img.src = e.target.result;
             img.onload = function () {
               let image = new Konva.Image({
-                x: nodePos.x - img.width / 2,
-                y: nodePos.y - img.height / 2,
+                x: nodePos.x,
+                y: nodePos.y,
+                // setup the offset so that we center the new image
+                offsetX: img.width / 2,
+                offsetY: img.height / 2,
                 image: img,
                 draggable: true,
                 imageB64: e.target.result,
@@ -200,6 +209,7 @@ container.addEventListener("keydown", function (e) {
         });
         layer.add(circle);
         tr.nodes([circle]);
+        setupSettings(circle);
         layer.draw();
       } else tr.nodes([]); // if we have a selection of multiple nodes, we deselect them
       break;
@@ -280,36 +290,40 @@ container.addEventListener("keydown", function (e) {
 
     // Save stage to a file
     case "S":
-      let toSave = stage.toJSON();
-      toSave = JSON.parse(toSave);
-      // flatten the children array recursively
-      let children = [];
-      let flatten = function (arr) {
-        if (Array.isArray(arr)) {
-          arr.forEach((child) => {
-            if (child.children) {
-              flatten(child.children);
-            }
-            if (child.className == "Image" || child.attrs?.name != null)
-              children.push(child.attrs);
-          });
-        }
-      };
-      flatten(toSave.children);
-      let a = document.createElement("a");
-      let jsToExport = `const getLevel = () => { return { gameObjects: 
-        ${JSON.stringify(children)}
-     } }`;
-      let file = new Blob([jsToExport], {
-        type: "text/javascript",
-      });
-      a.href = URL.createObjectURL(file);
-      a.download = "Level.js";
-      a.click();
+      saveStage();
       break;
   }
   e.preventDefault();
 });
+
+const saveStage = () => {
+  let toSave = stage.toJSON();
+  toSave = JSON.parse(toSave);
+  // flatten the children array recursively
+  let children = [];
+  let flatten = function (arr) {
+    if (Array.isArray(arr)) {
+      arr.forEach((child) => {
+        if (child.children) {
+          flatten(child.children);
+        }
+        if (child.className == "Image" || child.attrs?.name != null)
+          children.push(child.attrs);
+      });
+    }
+  };
+  flatten(toSave.children);
+  let a = document.createElement("a");
+  let jsToExport = `const getLevel = () => { return { gameObjects: 
+        ${JSON.stringify(children)}
+     } }`;
+  let file = new Blob([jsToExport], {
+    type: "text/javascript",
+  });
+  a.href = URL.createObjectURL(file);
+  a.download = "Level.js";
+  a.click();
+};
 
 function fitStageIntoParentContainer() {
   let container = document.querySelector("#stage-parent");
@@ -329,3 +343,127 @@ function fitStageIntoParentContainer() {
 fitStageIntoParentContainer();
 // adapt the stage on any window resize
 window.addEventListener("resize", fitStageIntoParentContainer);
+
+// SETTINGS!
+let settings = null;
+
+const setupToolbar = () => {
+  if (settings?.destroy) settings.destroy();
+  settings = QuickSettings.create(0, 0, "Toolbar");
+  settings.setDraggable(true);
+  settings.addButton("New", () => {
+    let circle = new Konva.Circle({
+      x: stage.width() / 2,
+      y: stage.height() / 2,
+      radius: 10,
+      fill: "white",
+      stroke: "black",
+      strokeWidth: 4,
+      draggable: true,
+    });
+    layer.add(circle);
+    tr.nodes([circle]);
+    setupSettings(circle);
+    layer.draw();
+  });
+  settings.addButton("Save", () => {
+    saveStage();
+  });
+};
+
+const setupSettings = (node) => {
+  if (settings?.destroy) settings.destroy();
+  settings = QuickSettings.create(0, 0, "Inspector");
+  settings.setDraggable(true);
+
+  settings.addText("Name", node.name(), (name) => {
+    node.name(name);
+  });
+  // setup image
+  if (node.className == "Image") {
+    settings.addImage("Image", node.attrs.imageB64, (img) => {
+      node.image(img);
+      layer.draw();
+    });
+  }
+  settings.addFileChooser(
+    "Change Image",
+    node.attrs?.imageName || "Circle",
+    "image/*",
+    (file) => {
+      let nodePos = node.getPosition();
+      let reader = new FileReader();
+      reader.onload = function (e) {
+        let img = new Image();
+        img.src = e.target.result;
+        img.onload = function () {
+          let image = new Konva.Image({
+            x: nodePos.x,
+            y: nodePos.y,
+            offsetX: img.width / 2,
+            offsetY: img.height / 2,
+            rotation: node.rotation(),
+            scaleX: node.scaleX(),
+            scaleY: node.scaleY(),
+            image: img,
+            draggable: true,
+            imageB64: e.target.result,
+            imageName: file.name.split(".")[0],
+            name: node.name(),
+          });
+          tr.nodes()[0].destroy();
+          tr.nodes([image]);
+          if (settings?.destroy) setupToolbar();
+          setupSettings(image);
+          layer.add(image);
+          layer.draw();
+        };
+      };
+      reader.readAsDataURL(file);
+    }
+  );
+  // position, rotation and scale
+  settings.addNumber("X", -Infinity, Infinity, node.x(), 1, (x) => {
+    node.x(x);
+    layer.draw();
+  });
+  settings.addNumber("Y", -Infinity, Infinity, node.y(), 1, (y) => {
+    node.y(y);
+    layer.draw();
+  });
+  settings.addRange("Rotation", -360, 360, node.rotation(), 1, (r) => {
+    node.rotation(r);
+    layer.draw();
+  });
+  settings.addNumber(
+    "Scale X",
+    -Infinity,
+    Infinity,
+    node.scaleX(),
+    0.1,
+    (s) => {
+      node.scaleX(s);
+      layer.draw();
+    }
+  );
+  settings.addNumber(
+    "Scale Y",
+    -Infinity,
+    Infinity,
+    node.scaleY(),
+    0.1,
+    (s) => {
+      node.scaleY(s);
+      layer.draw();
+    }
+  );
+
+  // setup z index
+  settings.addRange("Z Index", 0, 10, node.zIndex(), 1, (z) => {
+    node.zIndex(z);
+    layer.draw();
+  });
+};
+
+// initialize the toolbar
+setupToolbar();
