@@ -132,7 +132,7 @@ async function StartGame() {
       obj.Update = (delta) => {
         // follow camera
         let camera = engine.camera;
-        camera.SetPosition(obj.GetPos().x, obj.GetPos().y);
+        // camera.SetPosition(obj.GetPos().x, obj.GetPos().y);
         // engine.camera.SetRotationDeg(obj.rotation);
         // set zoom based on velocity
         let velocity = Matter.Vector.magnitudeSquared(obj.GetVelocity());
@@ -145,7 +145,7 @@ async function StartGame() {
         zoom = engine.clamp(zoom, minZoom, maxZoom);
         // smoothly zoom
         zoom = engine.lerp(camera.zoom, zoom, 0.01);
-        camera.SetZoom(zoom);
+        // camera.SetZoom(zoom);
       };
 
       obj.RenderGUI = () => {

@@ -530,6 +530,10 @@ class SceneManager {
       object?.Start();
     });
     this.engine.camera = new Camera(this.engine);
+    this.engine.camera.SetPosition(
+      this.engine.canvas.width / 2,
+      this.engine.canvas.height / 2
+    );
   }
 
   UpdateScene(delta) {
