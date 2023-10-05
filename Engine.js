@@ -425,16 +425,19 @@ class InputManager {
 
   init = (canvas) => {
     this.canvas = canvas;
-    //Set Event Listeners for window, mouse and touch
-    this.canvas.addEventListener("touchstart", this.touchDown, false);
-    this.canvas.addEventListener("touchmove", this.UpdateTouchEvent, false);
-    this.canvas.addEventListener("touchend", this.touchUp, false);
+    //Set Event Listeners for mobile
+    document.body.addEventListener("touchstart", this.touchDown, false);
+    document.body.addEventListener("touchmove", this.UpdateTouchEvent, false);
+    document.body.addEventListener("touchend", this.touchUp, false);
+    // for mouse
+    document.body.addEventListener("mousedown", this.touchDown, false);
+    document.body.addEventListener("mousemove", this.UpdateTouchEvent, false);
+    document.body.addEventListener("mouseup", this.touchUp, false);
 
     document.body.addEventListener("touchcancel", this.touchUp, false);
   };
 
   UpdateTouchEvent = (evt) => {
-    evt.preventDefault();
     this.lastEvent = evt;
   };
 
@@ -450,15 +453,18 @@ class InputManager {
   };
 
   getMoouseCoordsAfterTransform = (evt) => {
-    let mouseX = evt.touches[0].pageX;
-    let mouseY = evt.touches[0].pageY;
+    let mouseX = evt.touches?.length
+      ? evt.touches[0].pageX
+      : evt.pageX || evt.clientX;
+    let mouseY = evt.touches?.length
+      ? evt.touches[0].pageY
+      : evt.pageY || evt.clientY;
     let mouseToWorld = this.engine.viewportToWorld(mouseX, mouseY);
     return { x: mouseToWorld.x, y: mouseToWorld.y };
   };
 
   touchDown = (evt) => {
     //joke to be made about american football is unfortunately missing
-    evt.preventDefault();
     // account for canvas translation
     let mousePos = this.getMoouseCoordsAfterTransform(evt);
     this.lastPt = { x: mousePos.x, y: mousePos.y };
@@ -474,8 +480,7 @@ class InputManager {
   OnTouch = () => {
     //other than setting up our last touched position
     if (!this.lastEvent) return false;
-    this.lastEvent.preventDefault();
-    if (!this.touching || this.lastEvent.touches.length == 0) return false;
+    if (!this.touching || this.lastEvent.touches?.length == 0) return false;
     // account for canvas translation
     let mousePos = this.getMoouseCoordsAfterTransform(this.lastEvent);
     this.lastPt = { x: mousePos.x, y: mousePos.y };
