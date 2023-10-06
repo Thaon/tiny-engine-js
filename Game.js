@@ -1,76 +1,3 @@
-// async function StartGame() {
-//   const engine = new Engine();
-//   engine.debugPhysics = true;
-
-//   // load in the sprites we are going to use
-//   await engine.spritesManager.LoadSprite("ship", "./assets/Ship.jpg");
-//   await engine.spritesManager.LoadSprite("asteroid", "./assets/Asteroid.png");
-
-//   // add and customise the ground
-//   const ground = engine.AddGameObject("ground", engine.center.x, 1300, 0, 0);
-
-//   ground.SetRigidBody({
-//     type: "box",
-//     width: engine.canvas.width,
-//     height: 100,
-//     static: true,
-//   });
-
-//   // add and customise the ship
-//   const box = engine.AddGameObject(
-//     "box",
-//     engine.center.x - 50,
-//     500,
-//     0,
-//     100,
-//     100,
-//     0
-//   );
-//   box.SetSprite("ship", true);
-//   box.SetRigidBody({
-//     type: "box",
-//     width: 100,
-//     height: 150,
-//     static: false,
-//   });
-
-//   // and interactions
-//   box.OnTouch = () => {
-//     box.AddTorque(1);
-//   };
-
-//   // add and customise the circle
-//   const circle = engine.AddGameObject(
-//     "circle",
-//     engine.center.x,
-//     0,
-//     0,
-//     100,
-//     100,
-//     0
-//   );
-//   circle.SetSprite("asteroid");
-//   circle.SetRigidBody({
-//     type: "circle",
-//     radius: 50,
-//     static: false,
-//   });
-//   // and interactions
-//   circle.OnTouchUp = () => {
-//     circle.AddForce(0, -0.5);
-//   };
-
-//   // setup scene and add gameobjects
-//   const scene = engine.sceneManager.AddScene("game");
-//   // we add objects silently because this does not call the Start method on them
-//   scene.AddSilently(ground);
-//   scene.AddSilently(circle);
-//   scene.AddSilently(box);
-
-//   // we finally initialise the engine with the scene we want to start with
-//   engine.init(scene);
-// }
-
 async function StartGame() {
   const engine = new Engine();
   engine.debugPhysics = true;
@@ -79,10 +6,6 @@ async function StartGame() {
     "test",
     "./assets/Level3.js"
   );
-
-  // check that things are good
-  // console.log(level);
-  // console.log(engine.spritesManager.sprites);
 
   // setup scene and add gameobjects
   const scene = engine.sceneManager.AddScene("game");
@@ -132,8 +55,7 @@ async function StartGame() {
       obj.Update = (delta) => {
         // follow camera
         let camera = engine.camera;
-        // camera.SetPosition(obj.GetPos().x, obj.GetPos().y);
-        // engine.camera.SetRotationDeg(obj.rotation);
+        camera.SetPosition(obj.GetPos().x, obj.GetPos().y);
         // set zoom based on velocity
         let velocity = Matter.Vector.magnitudeSquared(obj.GetVelocity());
         let maxVelocity = 100;
@@ -141,16 +63,16 @@ async function StartGame() {
         let maxZoom = 1.5;
         let zoom = 1;
         // zoom out when moving fast
-        zoom = engine.lerp(minZoom, maxZoom, 1 - velocity / maxVelocity);
-        zoom = engine.clamp(zoom, minZoom, maxZoom);
+        zoom = engine.Lerp(minZoom, maxZoom, 1 - velocity / maxVelocity);
+        zoom = engine.Clamp(zoom, minZoom, maxZoom);
         // smoothly zoom
-        zoom = engine.lerp(camera.zoom, zoom, 0.01);
-        // camera.SetZoom(zoom);
+        zoom = engine.Lerp(camera.zoom, zoom, 0.01);
+        camera.SetZoom(zoom);
       };
 
       obj.RenderGUI = () => {
         // draw text for the camera coords
-        engine.drawText(
+        engine.DrawText(
           "Camera: " +
             engine.camera.x.toFixed(0) +
             ", " +
@@ -174,7 +96,7 @@ async function StartGame() {
           let velocity = Matter.Vector.normalise(obj.GetVelocity());
 
           // draw line to show desired velocity vector with engine.drawLine(x1, y1, x2, y2, color = "#fff", width = 1)
-          engine.drawLine(
+          engine.DrawLine(
             obj.GetPos().x,
             obj.GetPos().y,
             mousePos.x,
@@ -184,7 +106,7 @@ async function StartGame() {
           );
 
           //draw line to show velocity vector with engine.drawLine(x1, y1, x2, y2, color = "#fff", width = 1)
-          engine.drawLine(
+          engine.DrawLine(
             obj.GetPos().x,
             obj.GetPos().y,
             obj.GetPos().x + obj.GetVelocity().x * 10,
@@ -203,9 +125,9 @@ async function StartGame() {
     }
 
     // we add objects silently because this does not call the Start method on them
-    scene.AddSilently(obj);
+    scene.Add(obj);
   });
 
   // we finally initialise the engine with the scene we want to start with
-  engine.init(scene);
+  engine.Run(scene);
 }

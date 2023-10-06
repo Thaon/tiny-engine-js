@@ -122,7 +122,7 @@ class GameObject {
   Render = (delta) => {
     //gets called every tick by the engine, just before the particle systems are rendered
     if (this.sImage != null) {
-      this.engine.__drawImageExt(
+      this.engine._drawImageExt(
         this.sImage,
         this.x,
         this.y,
@@ -224,7 +224,7 @@ class Scene {
   objects = [];
   engine;
 
-  AddSilently = (object) => {
+  Add = (object) => {
     object.engine = this.engine;
     this.objects.push(object);
     if (object.body != null) {
@@ -258,7 +258,7 @@ class ParticleSystem {
     for (var i = 0; i < partNumber; i++) {
       this.particles.push(new create(xPos, yPos, spd, rad));
     }
-    this.renderParticles(theCanvasContext);
+    this._renderParticles(theCanvasContext);
   };
 
   create = (startX, startY, speed, radius) => {
@@ -287,7 +287,7 @@ class ParticleSystem {
   };
 
   // Render and move the particle
-  renderParticles = (theCanvasContext) => {
+  _renderParticles = (theCanvasContext) => {
     if (this.particles.length <= 0) return;
 
     var aCanvasContext = theCanvasContext;
@@ -378,29 +378,36 @@ class SpritesManager {
 class AudioManager {
   //the audio manager takes care of loading, storing, playing and stopping sounds, it is explained in more detail in the blog and wiki
   clips = [];
-  names = [];
 
   LoadAudio(name, path) {
     let audioClip = new Audio();
     audioClip.src = path;
-    this.clips.push(audioClip);
-    this.names.push(name);
+    this.clips.push({ clip: audioClip, name: name });
   }
 
   PlayAudio(name, looping) {
     for (let i = 0; i < this.clips.length; i++) {
-      if (this.names[i] == name) {
+      if (this.clips[i].name == name) {
         this.clips[i].loop = looping;
         this.clips[i].play();
       }
     }
   }
 
+  StopAudio = (name) => {
+    for (let i = 0; i < this.clips.length; i++) {
+      if (this.clips[i].name == name) {
+        this.clips[i].clip.pause();
+        this.clips[i].clip.currentTime = 0;
+      }
+    }
+  };
+
   StopAllAudio() {
     for (let i = 0; i < this.clips.length; i++) {
       {
-        this.clips[i].pause();
-        this.clips[i].currentTime = 0;
+        this.clips[i].clip.pause();
+        this.clips[i].clip.currentTime = 0;
       }
     }
   }
@@ -459,7 +466,7 @@ class InputManager {
     let mouseY = evt.touches?.length
       ? evt.touches[0].pageY
       : evt.pageY || evt.clientY;
-    let mouseToWorld = this.engine.viewportToWorld(mouseX, mouseY);
+    let mouseToWorld = this.engine.ViewportToWorld(mouseX, mouseY);
     return { x: mouseToWorld.x, y: mouseToWorld.y };
   };
 
@@ -520,14 +527,14 @@ class SceneManager {
   engine;
   activeScene = null;
 
-  AddScene(name) {
+  AddScene = (name) => {
     let scene = new Scene(name);
     scene.engine = this.engine;
 
     return scene;
-  }
+  };
 
-  LoadScene(scene) {
+  LoadScene = (scene) => {
     this.activeScene = scene;
     this.engine.inputManager.activeScene = scene;
 
@@ -539,9 +546,9 @@ class SceneManager {
       this.engine.canvas.width / 2,
       this.engine.canvas.height / 2
     );
-  }
+  };
 
-  UpdateScene(delta) {
+  UpdateScene = (delta) => {
     this.activeScene.objects.forEach(function (object) {
       // first we call Update
       object?.Update(delta);
@@ -554,33 +561,33 @@ class SceneManager {
         object.rotation = bodyAngleDeg;
       }
     });
-  }
+  };
 
-  Instantiate(object) {
+  Instantiate = (object) => {
     object.engine = this.engine;
     this.activeScene.objects.push(object);
     object.Start();
-  }
+  };
 
-  Destroy(object) {
+  Destroy = (object) => {
     let index = this.activeScene.objects.indexOf(object);
     this.activeScene.objects.splice(index, 1);
-  }
+  };
 
-  RenderScene(delta) {
+  RenderScene = (delta) => {
     this.activeScene.objects.forEach(function (object) {
       object?.Render(delta);
     });
-  }
+  };
 
-  RenderGUI(delta) {
+  RenderGUI = (delta) => {
     this.activeScene.objects.forEach(function (object) {
       object?.RenderGUI(delta);
     });
-  }
+  };
 }
 
-class Levelmanager {
+class LevelManager {
   //the level manager is responsible for loading, unloading and switching levels
   constructor(engine) {
     this.engine = engine;
@@ -605,7 +612,7 @@ class Level {
     this.path = path;
   }
 
-  async LoadLevel() {
+  LoadLevel = async () => {
     let p = new Promise((resolve, reject) => {
       require([this.path], () => {
         let levelData = getLevel().gameObjects;
@@ -641,7 +648,7 @@ class Level {
     });
 
     return p;
-  }
+  };
 
   engine;
   name;
@@ -676,19 +683,19 @@ class Camera {
     this.y = zoomedY;
   };
 
-  SetRotationDeg(degrees) {
+  SetRotationDeg = (degrees) => {
     this.rotation = (degrees * Math.PI) / 180;
-  }
+  };
 
-  SetRotationRad(radians) {
+  SetRotationRad = (radians) => {
     this.rotation = radians;
-  }
+  };
 
-  SetZoom(zoom) {
+  SetZoom = (zoom) => {
     this.zoom = zoom;
-  }
+  };
 
-  Update = (delta) => {
+  Update = () => {
     let originX = -(this.x - this.engine.canvas.width / 2);
     let originY = -(this.y - this.engine.canvas.height / 2);
     let ctx = this.engine.canvasContext;
@@ -714,12 +721,12 @@ class Engine {
 
     if (this.canvas.getContext) {
       //Set Event Listeners for window, mouse and touch
-      window.addEventListener("resize", this.resizeCanvas, false);
-      window.addEventListener("orientationchange", this.resizeCanvas, false);
+      window.addEventListener("resize", this._resizeCanvas, false);
+      window.addEventListener("orientationchange", this._resizeCanvas, false);
     }
-    this.resizeCanvas();
+    this._resizeCanvas();
 
-    this.levelManager = new Levelmanager(this);
+    this.levelManager = new LevelManager(this);
     this.sceneManager = new SceneManager(this);
     this.particleManager = new ParticleSystem();
     this.spritesManager = new SpritesManager();
@@ -749,160 +756,12 @@ class Engine {
   camera;
   lines = [];
   texts = [];
+  circles = [];
+  rectangles = [];
+  buttons = [];
 
-  resizeCanvas = () => {
-    this.canvas.width = window.innerWidth;
-    this.canvas.height = window.innerHeight;
-    this.center = { x: this.canvas.width / 2, y: this.canvas.height / 2 };
-  };
-
-  init = (startingScene) => {
-    //called when the page is loaded
-
-    this.start(startingScene);
-  };
-
-  start = (startingScene) => {
-    this.startTimeMS = Date.now();
-
-    this.inputManager.init(this.canvas);
-
-    this.sceneManager.engine = this;
-    this.sceneManager.LoadScene(startingScene);
-
-    this.physicsRunner = Matter.Runner.create();
-    Matter.Runner.run(this.physicsRunner, this.physicsEngine);
-    Matter.Events.on(this.physicsEngine, "beforeUpdate", this.updatePhysics);
-    Matter.Events.on(this.physicsEngine, "collisionEnd", this.collisionPhysics);
-
-    this.gameLoop();
-  };
-
-  gameLoop = () => {
-    let elapsed = (Date.now() - this.startTimeMS) / 1000;
-
-    if (this.inputManager.touching) this.inputManager.OnTouch();
-
-    this.sceneManager.UpdateScene(elapsed);
-    this.collisionDetection();
-    this.render(elapsed);
-
-    this.startTimeMS = Date.now();
-    requestAnimationFrame(this.gameLoop);
-  };
-
-  updatePhysics = () => {
-    this.sceneManager.activeScene.objects.forEach(function (object) {
-      object?.PhysicsUpdate();
-    });
-  };
-
-  collisionPhysics = (event) => {
-    if (event.pairs.length > 0) {
-      event.pairs.forEach((pair) => {
-        let bodyA = pair.bodyA;
-        let bodyB = pair.bodyB;
-        let gameObjectA = null;
-        let gameObjectB = null;
-        this.sceneManager.activeScene.objects.forEach((object) => {
-          if (object.body == bodyA) gameObjectA = object;
-          if (object.body == bodyB) gameObjectB = object;
-        });
-
-        if (gameObjectA != null) gameObjectA.OnCollision(gameObjectB);
-        if (gameObjectB != null) gameObjectB.OnCollision(gameObjectA);
-      });
-    }
-  };
-
-  render = (delta) => {
-    this.canvasContext.clearRect(0, 0, this.canvas.width, this.canvas.height);
-    this.canvasContext.fillRect(0, 0, this.canvas.width, this.canvas.height);
-
-    this.canvasContext.save();
-
-    // render camera viewport
-    this.camera.Update();
-
-    //render all GameObjects
-    this.sceneManager.RenderScene(delta);
-
-    // debug physics
-    if (this.debugPhysics) this.debugRenderPhysics();
-
-    //render particle systems on top
-    this.particleManager.renderParticles(this.canvasContext);
-
-    //render GUI
-    this.sceneManager.RenderGUI(delta);
-
-    // render all texts
-    this.texts.forEach((text) => {
-      this.__drawText(text.txt, text.x, text.y, text.txtColour, text.txtSize);
-    });
-
-    // render all lines
-    this.lines.forEach((line) => {
-      this.__drawLine(
-        line.x1,
-        line.y1,
-        line.x2,
-        line.y2,
-        line.color,
-        line.width
-      );
-    });
-
-    this.canvasContext.restore();
-
-    // clear texts and lines for next render cycle
-    this.lines = [];
-    this.texts = [];
-  };
-
-  debugRenderPhysics = () => {
-    let bodies = Matter.Composite.allBodies(this.physicsEngine.world);
-
-    this.canvasContext.beginPath();
-
-    for (var i = 0; i < bodies.length; i += 1) {
-      var vertices = bodies[i].vertices;
-
-      this.canvasContext.moveTo(vertices[0].x, vertices[0].y);
-
-      for (var j = 1; j < vertices.length; j += 1) {
-        this.canvasContext.lineTo(vertices[j].x, vertices[j].y);
-      }
-
-      this.canvasContext.lineTo(vertices[0].x, vertices[0].y);
-    }
-
-    this.canvasContext.lineWidth = 1;
-    this.canvasContext.strokeStyle = "#fff";
-    this.canvasContext.stroke();
-  };
-
-  collisionDetection = () => {
-    //simple AABB collision check that notifies colliders of the collision
-    for (var i = 0; i < this.sceneManager.activeScene.length - 1; i++) {
-      var coll1 = this.sceneManager.activeScene[i];
-      coll1Size = coll1.GetSize();
-      for (var j = i; j < this.sceneManager.activeScene.length; j++) {
-        var coll2 = this.sceneManager.activeScene[j];
-        coll2Size = coll2.GetSize();
-        //check for AABB collisions
-        if (
-          coll1.x + coll1Size.width > coll2.x &&
-          coll1.y + coll1Size.height > coll2.y &&
-          coll1.x < coll2.x + coll2Size.width &&
-          coll1.y < coll2.y + coll2Size.height
-        ) {
-          //notify colliders
-          coll1.OnCollision(coll2);
-          coll2.OnCollision(coll1);
-        }
-      }
-    }
+  Run = (startingScene) => {
+    this._start(startingScene);
   };
 
   // Utilities
@@ -936,32 +795,287 @@ class Engine {
     return object;
   };
 
-  lerp = (a, b, alpha) => {
+  // Maths utils
+
+  ViewportToWorld = (x, y) => {
+    // account for canvas translation and rotation
+    let worldX = x + this.camera.x - this.canvas.width / 2;
+    let worldY = y + this.camera.y - this.canvas.height / 2;
+
+    // account for camera zoom
+    worldX /= this.camera.zoom;
+    worldY /= this.camera.zoom;
+
+    return { x: worldX, y: worldY };
+  };
+
+  Lerp = (a, b, alpha) => {
     return a + alpha * (b - a);
   };
 
-  remap = (value, low1, high1, low2, high2) => {
+  Remap = (value, low1, high1, low2, high2) => {
     return low2 + ((high2 - low2) * (value - low1)) / (high1 - low1);
   };
 
-  clamp = (val, min, max) => {
+  Clamp = (val, min, max) => {
     return Math.min(Math.max(val, min), max) || min;
   };
 
-  __drawImage = (image, x, y, centered = false) => {
-    // this.canvasContext.save();
-    this.canvasContext.translate(x, y);
-    if (centered)
-      this.canvasContext.translate(image.width / 2, image.height / 2);
-    this.canvasContext.drawImage(image, 0, 0);
-    // this.canvasContext.restore();
+  Distance = (x1, y1, x2, y2) => {
+    return Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
   };
 
-  drawLine = (x1, y1, x2, y2, color = "#fff", width = 1) => {
+  // Drawing utils
+
+  DrawLine = (x1, y1, x2, y2, color = "#fff", width = 1) => {
     this.lines.push({ x1, y1, x2, y2, color, width });
   };
 
-  __drawLine = (x1, y1, x2, y2, color = "#fff", width = 1) => {
+  StyleText = (txtColour, txtFont, txtAlign, txtBaseline) => {
+    //utility function to style text in a single call
+    this.canvasContext.fillStyle = txtColour;
+    this.canvasContext.font = txtFont;
+    this.canvasContext.textAlign = txtAlign;
+    this.canvasContext.textBaseline = txtBaseline;
+  };
+
+  DrawText = (txt, x, y, txtColour, txtSize, align = "left") => {
+    this.texts.push({ txt, x, y, txtColour, txtSize, align });
+  };
+
+  DrawCircle = (x, y, radius, color = "#fff") => {
+    this.circles.push({ x, y, radius, color });
+  };
+
+  DrawRect = (x, y, width, height, color = "#fff", borderRadius = 0) => {
+    this.rectangles.push({ x, y, width, height, color, borderRadius });
+  };
+
+  AddButton = (
+    name,
+    text,
+    x,
+    y,
+    width,
+    height,
+    color = "#fff",
+    borderRadius = 0,
+    align = "center",
+    callback
+  ) => {
+    this.buttons.push({
+      name,
+      text,
+      x,
+      y,
+      width,
+      height,
+      color,
+      borderRadius,
+      align,
+      callback,
+    });
+  };
+
+  RemoveButton = (name) => {
+    this.buttons = this.buttons.filter((button) => button.name != name);
+  };
+
+  // internal utilities
+
+  _start = (startingScene) => {
+    this.startTimeMS = Date.now();
+
+    this.inputManager.init(this.canvas);
+
+    this.sceneManager.engine = this;
+    this.sceneManager.LoadScene(startingScene);
+
+    this.physicsRunner = Matter.Runner.create();
+    Matter.Runner.run(this.physicsRunner, this.physicsEngine);
+    Matter.Events.on(this.physicsEngine, "beforeUpdate", this._updatePhysics);
+    Matter.Events.on(
+      this.physicsEngine,
+      "collisionEnd",
+      this._collisionPhysics
+    );
+
+    this._gameLoop();
+  };
+
+  _gameLoop = () => {
+    let elapsed = (Date.now() - this.startTimeMS) / 1000;
+
+    if (this.inputManager.touching) this.inputManager.OnTouch();
+
+    this.sceneManager.UpdateScene(elapsed);
+    this._collisionDetection();
+    this._render(elapsed);
+
+    this.startTimeMS = Date.now();
+    requestAnimationFrame(this._gameLoop);
+  };
+
+  _updatePhysics = () => {
+    this.sceneManager.activeScene.objects.forEach(function (object) {
+      object?.PhysicsUpdate();
+    });
+  };
+
+  _collisionPhysics = (event) => {
+    if (event.pairs.length > 0) {
+      event.pairs.forEach((pair) => {
+        let bodyA = pair.bodyA;
+        let bodyB = pair.bodyB;
+        let gameObjectA = null;
+        let gameObjectB = null;
+        this.sceneManager.activeScene.objects.forEach((object) => {
+          if (object.body == bodyA) gameObjectA = object;
+          if (object.body == bodyB) gameObjectB = object;
+        });
+
+        if (gameObjectA != null) gameObjectA.OnCollision(gameObjectB);
+        if (gameObjectB != null) gameObjectB.OnCollision(gameObjectA);
+      });
+    }
+  };
+
+  _render = (delta) => {
+    this.canvasContext.clearRect(0, 0, this.canvas.width, this.canvas.height);
+    this.canvasContext.fillRect(0, 0, this.canvas.width, this.canvas.height);
+
+    this.canvasContext.save();
+
+    // render camera viewport
+    this.camera.Update();
+
+    //render all GameObjects
+    this.sceneManager.RenderScene(delta);
+
+    // debug physics
+    if (this.debugPhysics) this._debugRenderPhysics();
+
+    //render particle systems on top
+    this.particleManager._renderParticles(this.canvasContext);
+
+    //render GUI
+    this.sceneManager.RenderGUI(delta);
+
+    // render all texts
+    this.texts.forEach((text) => {
+      this._drawText(
+        text.txt,
+        text.x,
+        text.y,
+        text.txtColour,
+        text.txtSize,
+        text.align
+      );
+    });
+
+    // render all lines
+    this.lines.forEach((line) => {
+      this._drawLine(
+        line.x1,
+        line.y1,
+        line.x2,
+        line.y2,
+        line.color,
+        line.width
+      );
+    });
+
+    // render all circles
+    this.circles.forEach((circle) => {
+      this._drawCircle(circle.x, circle.y, circle.radius, circle.color);
+    });
+
+    // render all rectangles
+    this.rectangles.forEach((rectangle) => {
+      this._drawRect(
+        rectangle.x,
+        rectangle.y,
+        rectangle.width,
+        rectangle.height,
+        rectangle.color,
+        rectangle.borderRadius
+      );
+    });
+
+    // render all buttons
+    this.buttons.forEach((button) => {
+      this._drawButton(
+        button.text,
+        button.x,
+        button.y,
+        button.width,
+        button.height,
+        button.color,
+        button.borderRadius,
+        button.align,
+        button.callback
+      );
+    });
+
+    this.canvasContext.restore();
+
+    // clear texts and lines for next render cycle
+    this.lines = [];
+    this.texts = [];
+  };
+
+  _debugRenderPhysics = () => {
+    let bodies = Matter.Composite.allBodies(this.physicsEngine.world);
+
+    this.canvasContext.beginPath();
+
+    for (var i = 0; i < bodies.length; i += 1) {
+      var vertices = bodies[i].vertices;
+
+      this.canvasContext.moveTo(vertices[0].x, vertices[0].y);
+
+      for (var j = 1; j < vertices.length; j += 1) {
+        this.canvasContext.lineTo(vertices[j].x, vertices[j].y);
+      }
+
+      this.canvasContext.lineTo(vertices[0].x, vertices[0].y);
+    }
+
+    this.canvasContext.lineWidth = 1;
+    this.canvasContext.strokeStyle = "#fff";
+    this.canvasContext.stroke();
+  };
+
+  _collisionDetection = () => {
+    //simple AABB collision check that notifies colliders of the collision
+    for (var i = 0; i < this.sceneManager.activeScene.length - 1; i++) {
+      var coll1 = this.sceneManager.activeScene[i];
+      coll1Size = coll1.GetSize();
+      for (var j = i; j < this.sceneManager.activeScene.length; j++) {
+        var coll2 = this.sceneManager.activeScene[j];
+        coll2Size = coll2.GetSize();
+        //check for AABB collisions
+        if (
+          coll1.x + coll1Size.width > coll2.x &&
+          coll1.y + coll1Size.height > coll2.y &&
+          coll1.x < coll2.x + coll2Size.width &&
+          coll1.y < coll2.y + coll2Size.height
+        ) {
+          //notify colliders
+          coll1.OnCollision(coll2);
+          coll2.OnCollision(coll1);
+        }
+      }
+    }
+  };
+
+  _resizeCanvas = () => {
+    this.canvas.width = window.innerWidth;
+    this.canvas.height = window.innerHeight;
+    this.center = { x: this.canvas.width / 2, y: this.canvas.height / 2 };
+  };
+
+  _drawLine = (x1, y1, x2, y2, color = "#fff", width = 1) => {
     this.canvasContext.beginPath();
     this.canvasContext.moveTo(x1, y1);
     this.canvasContext.lineTo(x2, y2);
@@ -970,7 +1084,16 @@ class Engine {
     this.canvasContext.stroke();
   };
 
-  __drawImageExt = (
+  _drawImage = (image, x, y, centered = false) => {
+    // this.canvasContext.save();
+    this.canvasContext.translate(x, y);
+    if (centered)
+      this.canvasContext.translate(image.width / 2, image.height / 2);
+    this.canvasContext.drawImage(image, 0, 0);
+    // this.canvasContext.restore();
+  };
+
+  _drawImageExt = (
     image,
     x,
     y,
@@ -997,38 +1120,14 @@ class Engine {
     this.canvasContext.restore();
   };
 
-  styleText = (txtColour, txtFont, txtAlign, txtBaseline) => {
-    //utility function ised to style text in a single call
-    this.canvasContext.fillStyle = txtColour;
-    this.canvasContext.font = txtFont;
-    this.canvasContext.textAlign = txtAlign;
-    this.canvasContext.textBaseline = txtBaseline;
-  };
-
-  drawText = (txt, x, y, txtColour, txtSize) => {
-    this.texts.push({ txt, x, y, txtColour, txtSize });
-  };
-
-  __drawText = (txt, x, y, txtColour, txtSize) => {
+  _drawText = (txt, x, y, txtColour, txtSize) => {
     this.canvasContext.fillStyle = txtColour;
     this.canvasContext.font = txtSize + "px Arial";
     // invert canvas rotation
     this.canvasContext.rotate(this.camera.rotation);
-    let coords = this.viewportToWorld(x, y);
+    let coords = this.ViewportToWorld(x, y);
     this.canvasContext.fillText(txt, coords.x, coords.y);
     // restore canvas rotation
     this.canvasContext.rotate(-this.camera.rotation);
-  };
-
-  viewportToWorld = (x, y) => {
-    // account for canvas translation and rotation
-    let worldX = x + this.camera.x - this.canvas.width / 2;
-    let worldY = y + this.camera.y - this.canvas.height / 2;
-
-    // account for camera zoom
-    worldX /= this.camera.zoom;
-    worldY /= this.camera.zoom;
-
-    return { x: worldX, y: worldY };
   };
 }
